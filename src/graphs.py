@@ -19,6 +19,10 @@ class Node:
     
     def __str__(self) -> str:
         return f"P[{self.id}]({self.x},{self.y}"
+
+    def update_position(self, x, y):
+        self.x = x
+        self.y = y
     
     # if connected returns Edge, else None. If argument provided is not Node or ID raise error
     def get_edge(self, other):
@@ -79,4 +83,5 @@ class Edge:
             return
         v = self.origin
         u = self.end
-        if u.get_edge()
+        if u.get_edge():
+            pass
