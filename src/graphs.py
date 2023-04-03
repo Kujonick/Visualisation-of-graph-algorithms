@@ -1,8 +1,8 @@
-from errors import *
+from errors import WrongTypeConnect
 
 class Node:
 
-    
+
     def __init__(self, x : float, y : float, id : int) -> None:
         self.x = x          # Node position
         self.y = y          # (x,y)
@@ -51,7 +51,19 @@ class Node:
              other.edges[self.id] = edge
         
         return True
+    
+    # deletes Edge in 
+    def disconnect(self, other) -> bool:
+        if not isinstance(other,Node):
+            raise WrongTypeConnect
         
+        edge = self.get_edge(other)
+        if edge != None:    # Edge from self to other exists
+            del self.edges[other.id]
+            if not edge.directed:
+                del other.edges[other.id]
+            return True
+        return False        
 
         
 
@@ -77,6 +89,25 @@ class Edge:
     def change_to_directed(self) -> None:
         if self.directed:
             return
-        v = self.origin
-        u = self.end
-        if u.get_edge()
+        origin = self.origin
+        end = self.end
+        edge = end.get_edge(origin) 
+        
+        
+        if edge != None:        #checks if is other way Edge present
+
+            if self.maxflow == None and edge.maxflow != None:   #checks if is other way Edge present
+                    self.maxflow = edge.maxflow
+            elif edge.maxflow != None:
+                self.maxflow = min(self.maxflow, edge.maxflow)
+
+            #---- w dalekiej przyszłości ----#
+            if self.minflow == None and edge.minflow != None:
+                    self.minflow = edge.minflow
+            elif edge.maxflow != None:
+                self.minflow = min(self.minflow, edge.minflow)
+
+            del end.edges[self.origin.id]
+            
+        end.edges[self.origin.id] = self
+        
