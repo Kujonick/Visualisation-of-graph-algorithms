@@ -23,6 +23,9 @@ class Node:
     def update_position(self, x, y):
         self.x = x
         self.y = y
+
+    def to_save(self) -> str:
+        return f"{self.id} {self.x} {self.y}"
     
     # if connected returns Edge, else None. If argument provided is not Node or ID raise error
     def get_edge(self, other):
@@ -58,6 +61,7 @@ class Node:
     
     # deletes Edge in 
     def disconnect(self, other) -> bool:
+
         if not isinstance(other,Node):
             raise WrongTypeConnect
         
@@ -75,7 +79,7 @@ class Node:
 class Edge:
 
 
-    def __init__(self, node1, node2, directed, maxflow=None, flow=0, minflow=None) -> None:
+    def __init__(self, node1 :Node, node2 :Node, directed :bool, maxflow :int=None , flow=0, minflow:int=None) -> None:
         self.origin = node1
         self.end = node2
         self.directed = directed
@@ -114,4 +118,6 @@ class Edge:
             del end.edges[self.origin.id]
             
         end.edges[self.origin.id] = self
-        
+    
+    def to_save(self) -> str:
+        return f"{self.origin.id} {self.end.id} {1 if self.directed else 0} {self.maxflow} {self.minflow}"
