@@ -2,12 +2,12 @@ from errors import WrongTypeConnect
 
 class Node:
 
-
-    def __init__(self, x : float, y : float, id : int) -> None:
+    def __init__(self, id : int, x : float, y : float) -> None:
         self.x = x          # Node position
         self.y = y          # (x,y)
         self.id = id        # identyfication number (one and only one for a graph)
         self.edges = dict()
+        self.v = None       
 
     def __eq__(self, other) -> bool:
         if not isinstance(other,Node):
@@ -18,7 +18,7 @@ class Node:
         return hash(self.id)
     
     def __str__(self) -> str:
-        return f"P[{self.id}]({self.x},{self.y}"
+        return f"P[{self.id}] ({self.x},{self.y})"
 
     def update_position(self, x, y):
         self.x = x
@@ -27,6 +27,16 @@ class Node:
     def to_save(self) -> str:
         return f"{self.id} {self.x} {self.y}"
     
+    def show(self):
+        print(self)
+        for k in self.edges.keys():
+            edge : Edge = self.edges[k]
+            if edge.directed:
+                arrow = '->'
+            else:
+                arrow = '--'
+            print(f" {arrow}{k} {edge.minflow}/ {edge.flow} /{edge.maxflow}")
+            
     # if connected returns Edge, else None. If argument provided is not Node or ID raise error
     def get_edge(self, other):
         if isinstance(other, Node):
@@ -90,16 +100,24 @@ class Edge:
     def __hash__(self) -> int:
         return 3*hash(self.origin) + hash(self.end)
     
-
+    def __eq__(self,other) -> bool:
+        if not isinstance(other,Edge):
+            return False
+        other : Edge
+        if other.directed != self.directed:
+            return False
+        if self.directed:
+            return self.origin.id == other.origin.id and self.end.id == other.end.id
+        return (self.origin.id == other.origin.id and self.end.id == other.end.id) or self.origin.id==other.end.id and self.end.id == other.origin.id
     def change_flow(self, change) :
         self.flow += change
 
-    def change_to_directed(self) -> None:
-        if self.directed:
+    def change_to_undirected(self) -> None:
+        if not self.directed:
             return
         origin = self.origin
         end = self.end
-        edge = end.get_edge(origin) 
+        edge : Edge= end.get_edge(origin) 
         
         
         if edge != None:        #checks if is other way Edge present
@@ -116,8 +134,43 @@ class Edge:
                 self.minflow = min(self.minflow, edge.minflow)
 
             del end.edges[self.origin.id]
-            
+        self.directed = False
         end.edges[self.origin.id] = self
+
+    def change_to_directed(self) -> None:
+        if self.directed:
+            return
+        del self.end.edges[self.origin.id]
+        self.directed = True
+
+    #Returns True if there's no edge in other direction between these two nodes
+    def can_be_reversed(self) -> bool:
+        if not self.directed:
+            return False
+        
+        end = self.end
+        if end.get_edge(self.origin.id) != None:
+            return False
+        return True
     
+    # changes direction of Edge, return False on failure
+    def reverse(self) -> bool:
+        if not self.can_be_reversed():
+            return False
+        origin = self.origin
+        end = self.end
+        del self.origin.edges[end.id]
+        end.edges[origin.id] = self
+        self.origin, self.end = self.end, self.origin
+        return True
+            
+
     def to_save(self) -> str:
         return f"{self.origin.id} {self.end.id} {1 if self.directed else 0} {self.maxflow} {self.minflow}"
+
+
+if __name__ and "__main__":
+    node = Node(1,2,0)
+    n2 = Node(1,2,1)
+    node.connect(n2,True)
+    node.show()

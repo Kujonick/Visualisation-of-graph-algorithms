@@ -25,7 +25,7 @@ def graph_read(filename : str) -> List[Node]:
             list_of_nodes = []
             for i in range(node_count):
                 line = f.readline().strip().split()
-                v = Node(int(line[0]), int(line[1]), int(line[2]))
+                v = Node(int(line[0]), float(line[1]), float(line[2]))
                 list_of_nodes.append(v)
                 line_count += 1
             for line in f:
