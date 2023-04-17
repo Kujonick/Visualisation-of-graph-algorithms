@@ -1,16 +1,19 @@
+#
 import sys
-import math
 from graphs import Node
 from PyQt5.QtWidgets import QApplication, QMainWindow, QGraphicsScene, QGraphicsView, QGraphicsTextItem, \
-    QGraphicsEllipseItem, QGraphicsLineItem, QGraphicsItem, QGraphicsPolygonItem
-from PyQt5.QtGui import QPen, QBrush, QColor, QPolygonF, QTransform
-from PyQt5.QtCore import Qt, QPointF, QLineF
+    QGraphicsEllipseItem, QGraphicsLineItem, QGraphicsItem, QGraphicsPolygonItem, QPushButton, QGridLayout, QWidget
+from PyQt5.QtGui import QPen, QBrush, QColor, QPolygonF, QTransform, QPainter
+from PyQt5.QtCore import Qt, QPointF, QLineF, QEvent, QObject, pyqtSignal, pyqtSlot
 
+modes = {
+    "Add Vertex": False,
+    "Delete Vertex/Edge": False
+}
 
 class Vertex(QGraphicsEllipseItem):
     def __init__(self, node):
         super().__init__(node.x, node.y, 34, 34)
-
         # Remember initial position of vertex for mouseReleaseEvent
         self.initial_x = node.x
         self.initial_y = node.y
@@ -30,6 +33,8 @@ class Vertex(QGraphicsEllipseItem):
         # Store edges of the Vertex
         self.edges = []
 
+        # Set signal in case of removal
+
     def add_connection(self, edge):
         self.edges.append(edge)
 
@@ -37,7 +42,20 @@ class Vertex(QGraphicsEllipseItem):
         super().mouseMoveEvent(event)
         for edge in self.edges:
             edge.adjust()
+
         self.node.update_position(self.initial_x + self.x(), self.initial_y + self.y())
+
+    def mousePressEvent(self, event):
+        super().mousePressEvent(event)
+        if event.button() == Qt.LeftButton and modes["Delete Vertex/Edge"]:
+            for edge in self.edges:
+                self.scene().removeItem(edge)
+                del edge
+
+            self.edges.clear()
+            self.scene().vertex_deleted_sig.emit(self.node.id)
+            self.scene().removeItem(self)
+            del self
 
 
 class Connection(QGraphicsLineItem):
@@ -54,50 +72,44 @@ class Connection(QGraphicsLineItem):
         line = QLineF(start_pos, end_pos)
         self.setLine(line)
 
-        if self.directed:
-            self.arrowhead.adjust(self)
+    def mousePressEvent(self, event):
+        super().mousePressEvent(event)
+        if event.button() == Qt.LeftButton and modes["Delete Vertex/Edge"]:
+            self.origin.edges.remove(self)
+            self.end.edges.remove(self)
+            self.scene().removeItem(self)
+            del self
 
-    def set_arrowhead(self, arrowhead):
-        self.arrowhead = arrowhead
 
+class GraphicsScene(QGraphicsScene):
+    vertex_deleted_sig = pyqtSignal(int)
+    vertex_add_sig = pyqtSignal(tuple)
 
-class Arrowhead(QGraphicsPolygonItem):
-    def __init__(self, line):
+    def __init__(self):
         super().__init__()
-        self.adjust(line)
 
-    def adjust(self, line):
-        origin_vertex_x = line.origin.x() + line.origin.initial_x
-        end_vertex_x = line.end.x() + line.end.initial_x
-        origin_vertex_y = line.origin.y() + line.origin.initial_y
-        end_vertex_y = line.end.y() + line.end.initial_y
+    def mousePressEvent(self, event):
+        super().mousePressEvent(event)
+        if event.button() == Qt.LeftButton and modes["Add Vertex"]:
 
-        dx, dy = origin_vertex_x - end_vertex_x, origin_vertex_y - end_vertex_y
-        length = math.sqrt(dx**2 + dy**2)
-        norm_x, norm_y = dx/length, dy/length
-        perp_x, perp_y = -norm_y, norm_x
+            self.vertex_add_sig.emit((event.scenePos().x() - 17, event.scenePos().y() - 17))
 
-        left_x = end_vertex_x + 5 * norm_x + 15 * perp_x
-        left_y = end_vertex_y + 5 * norm_y + 15 * perp_y
-
-        right_x = end_vertex_x + 5 * norm_x - 15 * perp_x
-        right_y = end_vertex_y + 5 * norm_y - 15 * perp_y
-
-        left_point = QPointF(left_x, left_y)
-        right_point = QPointF(right_x, right_y)
-        end_point = QPointF(end_vertex_x, end_vertex_y)
-        self.setPolygon(QPolygonF([left_point, end_point, right_point]))
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
 
-        # Create a QGraphicsScene to hold the nodes
-        self.scene = QGraphicsScene()
+        # Initialize Graph #
+
+        # Create a QGraphicsScene to hold the nodes and connect signals
+        self.scene = GraphicsScene()
+        self.scene.vertex_deleted_sig.connect(self.delete_vertex)
+        self.scene.vertex_add_sig.connect(self.add_vertex)
 
         # Create a QGraphicsView to display the scene
         self.view = QGraphicsView(self.scene)
-
+        self.view.setRenderHints(QPainter.Antialiasing)
+        self.installEventFilter(self.view)
         # Set the window properties
         self.setWindowTitle("Node Viewer")
         self.setGeometry(100, 100, 800, 600)
@@ -106,7 +118,7 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(self.view)
 
         # example nodes
-        nodes = [Node(0, 100, 100), Node(10, 200, 200), Node(222, 300, 100)]
+        nodes = [Node(0, 100, 100), Node(1, 200, 200), Node(2, 300, 100)]
         nodes[0].connect(nodes[1], False)
         nodes[0].connect(nodes[2], False)
         nodes[2].connect(nodes[1], False)
@@ -118,10 +130,24 @@ class MainWindow(QMainWindow):
         for node in nodes:
             vertex = self.create_vertex(node)
             self.scene.addItem(vertex)
-            self.vertices[node.id] = vertex
         for node in nodes:
             for edge in node.edges.values():
                 self.scene.addItem(self.create_edge(edge))
+
+        # Initialize UI #
+
+        # Create grid and buttons
+        grid = QGridLayout(self.view)
+        self.delete_mode_button = QPushButton("Delete Vertex/Edge", self)
+        self.delete_mode_button.clicked.connect(self.buttons_handler)
+        self.add_vertex_mode_button = QPushButton("Add Vertex", self)
+        self.add_vertex_mode_button.clicked.connect(self.buttons_handler)
+
+        grid.addWidget(self.delete_mode_button, 0, 0, Qt.AlignLeft | Qt.AlignBottom)
+        grid.addWidget(self.add_vertex_mode_button, 0, 1, Qt.AlignLeft | Qt.AlignBottom)
+        grid.setColumnStretch(3, 1)
+        grid.setSpacing(0)
+        grid.setContentsMargins(0, 0, 0, 0)
 
     def create_vertex(self, node):
         # Create a QGraphicsTextItem to hold the node index
@@ -129,6 +155,7 @@ class MainWindow(QMainWindow):
 
         # Create a vertex to represent the node
         vertex = Vertex(node)
+        # vertex.deleted.connect(self.delete_vertex)
 
         # Add the text to the vertex
         text.setParentItem(vertex)
@@ -140,6 +167,17 @@ class MainWindow(QMainWindow):
         # Add the vertex to dictionary and return it
         self.vertices[node.id] = vertex
         return vertex
+
+    @pyqtSlot(int)
+    def delete_vertex(self, node_id):
+        del self.vertices[node_id]
+
+    @pyqtSlot(tuple)
+    def add_vertex(self, position):
+        available_id = max(list(self.vertices.keys())) + 1
+        node = Node(available_id, position[0], position[1])
+        self.scene.addItem(self.create_vertex(node))
+
 
     def create_edge(self, edge):
         # Create an edge to represent the connection between two vertices
@@ -153,8 +191,9 @@ class MainWindow(QMainWindow):
         line.setPen(pen)
 
         # if edge is directed - add arrowhead
+        '''
         if edge.directed:
-            self.create_arrowhead(line)
+            self.create_arrowhead(line)'''
 
         # Add the edge to the origin/end vertex's edges list
         origin_vertex.add_connection(line)
@@ -163,17 +202,9 @@ class MainWindow(QMainWindow):
         # Return the edge
         return line
 
-    def create_arrowhead(self, line):
-        # Create Arrowhead object
-        arrowhead = Arrowhead(line)
-
-        # Set Pen & Brush
-        arrowhead.setPen(QPen(Qt.black))
-        arrowhead.setBrush(QBrush(Qt.black))
-
-        # Attach arrowhead to line
-        line.set_arrowhead(arrowhead)
-        self.scene.addItem(arrowhead)
+    def buttons_handler(self):
+        button_type = self.sender().text()
+        modes[button_type] = not modes[button_type]
 
 
 if __name__ == "__main__":
