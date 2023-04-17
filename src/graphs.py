@@ -31,11 +31,9 @@ class Node:
         print(self)
         for k in self.edges.keys():
             edge : Edge = self.edges[k]
-            if edge.directed:
-                arrow = '->'
-            else:
-                arrow = '--'
-            print(f" {arrow}{k} {edge.minflow}/ {edge.flow} /{edge.maxflow}")
+            print('|',edge)
+        print('L----------------\n')
+            
             
     # if connected returns Edge, else None. If argument provided is not Node or ID raise error
     def get_edge(self, other):
@@ -49,7 +47,7 @@ class Node:
         return self.edges.get(id, None)
     
     # adds new Edge to Node.edges.  Returns False if nothing's changed
-    def connect(self, other, directed : bool) -> bool:
+    def connect(self, other, directed : bool, maxflow :int=None, minflow:int=None, cost:int = None) -> bool:
         if not isinstance(other,Node):
             raise WrongTypeConnect
         
@@ -58,18 +56,18 @@ class Node:
             return False
         
         
-        if directed != False and other.get_edge(self) != None:  # Edge of undirected graph shan't be connected to Node which has already directed Edge to this one 
+        if not directed and other.get_edge(self) != None:  # Edge of undirected graph shan't be connected to Node which has already directed Edge to this one 
             return False                                        # It should not accur frequently, but must be handled
         
 
-        edge = Edge(self, other, directed)
+        edge = Edge(self, other, directed, maxflow=maxflow, minflow=minflow, cost=cost)
         self.edges[other.id] = edge  
         if not directed:
              other.edges[self.id] = edge
         
         return True
     
-    # deletes Edge in 
+    # deletes Edge in .edges
     def disconnect(self, other) -> bool:
 
         if not isinstance(other,Node):
@@ -88,14 +86,15 @@ class Node:
 
 class Edge:
 
-
-    def __init__(self, node1 :Node, node2 :Node, directed :bool, maxflow :int=None , flow=0, minflow:int=None) -> None:
+    def __init__(self, node1 :Node, node2 :Node, directed :bool, maxflow :int=None , 
+                 flow=0, minflow:int=None, cost:int = None ) -> None:
         self.origin = node1
         self.end = node2
         self.directed = directed
         self.maxflow = maxflow
         self.flow = flow
         self.minflow = minflow
+        self.cost = cost
 
     def __hash__(self) -> int:
         return 3*hash(self.origin) + hash(self.end)
@@ -109,9 +108,39 @@ class Edge:
         if self.directed:
             return self.origin.id == other.origin.id and self.end.id == other.end.id
         return (self.origin.id == other.origin.id and self.end.id == other.end.id) or self.origin.id==other.end.id and self.end.id == other.origin.id
-    def change_flow(self, change) :
+    
+    def __str__(self) -> str:
+        if self.directed:
+            arrow = '->'
+        else:
+            arrow = '--'
+        return (f" {self.origin.id} {arrow} {self.end.id}    {self.minflow}/ {self.flow} /{self.maxflow}   c:{self.cost}")
+
+    def get_flow(self) -> int:
+        return self.flow
+    
+    def change_flow_to(self, flow) -> None:
+        self.flow = flow
+
+    def change_flow(self, change) -> None:
+        if self.maxflow != None and self.flow + change > self.maxflow:
+            return OverflowError
         self.flow += change
 
+    def set_maxflow(self, value :int) -> None:
+        if not isinstance(value, int):
+            raise ValueError
+        self.maxflow = value
+
+    def get_cost(self) -> int:
+        return self.cost
+    
+    def set_cost(self, value:int) -> None:
+        if not isinstance(value, int):
+            raise ValueError
+        self.cost = value
+    
+    # changes Edge to undirected, if there is another in opposite direction, both are merged
     def change_to_undirected(self) -> None:
         if not self.directed:
             return
@@ -129,21 +158,22 @@ class Edge:
 
             #---- w dalekiej przyszłości ----#
             if self.minflow == None and edge.minflow != None:
-                    self.minflow = edge.minflow
-            elif edge.maxflow != None:
+                self.minflow = edge.minflow
+            elif edge.minflow != None:
                 self.minflow = min(self.minflow, edge.minflow)
 
             del end.edges[self.origin.id]
         self.directed = False
         end.edges[self.origin.id] = self
 
+    # changes Edge to directed
     def change_to_directed(self) -> None:
         if self.directed:
             return
         del self.end.edges[self.origin.id]
         self.directed = True
 
-    #Returns True if there's no edge in other direction between these two nodes
+    # Returns True if there's no edge in other direction between these two nodes
     def can_be_reversed(self) -> bool:
         if not self.directed:
             return False
@@ -164,13 +194,62 @@ class Edge:
         self.origin, self.end = self.end, self.origin
         return True
             
-
+    # function return string which contains edge saving 
     def to_save(self) -> str:
-        return f"{self.origin.id} {self.end.id} {1 if self.directed else 0} {self.maxflow} {self.minflow}"
+        return f"{self.origin.id} {self.end.id} {1 if self.directed else 0} {self.maxflow} {self.minflow} {self.cost}"
 
 
-if __name__ and "__main__":
-    node = Node(1,2,0)
-    n2 = Node(1,2,1)
-    node.connect(n2,True)
-    node.show()
+if __name__ == "__main__":
+    def directed_change_test(prints = False):
+        L = [Node(0,2,0),Node(1,2,1)]
+        L[0].connect(L[1],False, maxflow=10)
+        print("\n##### direction change test")
+        if prints:
+            print("### Before change")
+            for v in L:
+                v.show()
+        e : Edge= L[0].get_edge(1)
+        e.change_to_directed()
+        if prints:
+            print("### After change")
+            for v in L:
+                v.show()
+        L[1].connect(L[0], True, 5)
+        if prints:
+            print("### After additional edge")
+            for v in L:
+                v.show()
+        e.change_to_undirected()
+        if prints:
+            print("### After second change")
+            for v in L:
+                v.show()
+        print(len(L[0].edges) == 1)
+        print(len(L[1].edges) == 1)
+        print(L[0].get_edge(L[1]).maxflow == 5)
+        print(L[1].get_edge(L[0]).maxflow == 5)
+
+    def edge_properties_test():
+        print("\n##### edge properties test")
+        n1, n2 = Node(0,0,0), Node(1,0,1)
+        n1.connect(n2, True)
+        e:Edge = n1.get_edge(n2)
+        print("basic:        ",e)
+        e.change_flow_to(5)
+        print("changed flow: ",e)
+        e.change_flow(-2)
+        print("lowered flow: ",e)
+        e.set_maxflow(8)
+        print("set maxflow:  ",e)
+        e.set_cost(3)
+        print("set cost:     ",e)
+        e.reverse()
+        print("reversed:     ",e)
+        n1.connect(n2, True)
+        e.reverse()
+        print("can't reverse:",e)
+        n1.show()
+        n2.show()
+
+    directed_change_test()
+    edge_properties_test()
