@@ -116,6 +116,9 @@ class Edge:
             arrow = '--'
         return (f" {self.origin.id} {arrow} {self.end.id}    {self.minflow}/ {self.flow} /{self.maxflow}   c:{self.cost}")
 
+    def remove(self) -> None:
+        self.origin.disconnect(self.end)
+
     def get_flow(self) -> int:
         return self.flow
     
