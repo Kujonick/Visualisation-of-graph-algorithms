@@ -1,10 +1,10 @@
 import sys
-from graphs import Node, Edge
+from graphs import Node
 from PyQt5.QtWidgets import QApplication, QMainWindow, QGraphicsScene, QGraphicsView, QGraphicsTextItem, \
-    QGraphicsEllipseItem, QGraphicsLineItem, QGraphicsItem, QGraphicsPolygonItem, QPushButton, QGridLayout, QWidget, \
-    QDialog, QLabel, QLineEdit, QVBoxLayout, QMessageBox
-from PyQt5.QtGui import QPen, QBrush, QColor, QPolygonF, QTransform, QPainter
-from PyQt5.QtCore import Qt, QPointF, QLineF, QEvent, QObject, pyqtSignal, pyqtSlot
+    QGraphicsEllipseItem, QGraphicsLineItem, QPushButton, QGridLayout, QDialog, QLabel, QLineEdit, QVBoxLayout, \
+    QMessageBox
+from PyQt5.QtGui import QPen, QBrush, QColor, QPainter
+from PyQt5.QtCore import Qt, QPointF, QLineF, pyqtSignal, pyqtSlot
 
 modes = {
     "Add Vertex": False,
@@ -120,7 +120,7 @@ class MainWindow(QMainWindow):
         # example nodes
         nodes = [Node(0, 100, 100), Node(1, 200, 200), Node(2, 300, 100)]
         nodes[0].connect(nodes[1], False)
-        #nodes[0].connect(nodes[2], False)
+        # nodes[0].connect(nodes[2], False)
         nodes[2].connect(nodes[1], False)
 
         # Create a dictionary to store vertex objects
@@ -137,7 +137,8 @@ class MainWindow(QMainWindow):
         # Initialize UI #
 
         # Create grid and buttons
-        grid = QGridLayout(self.view)
+        self.grid = QGridLayout(self.view)
+
         self.delete_mode_button = QPushButton("Delete Vertex/Edge", self)
         self.delete_mode_button.clicked.connect(self.buttons_handler)
         self.add_vertex_mode_button = QPushButton("Add Vertex", self)
@@ -145,17 +146,32 @@ class MainWindow(QMainWindow):
         self.add_edge_mode_button = QPushButton("Add Edge", self)
         self.add_edge_mode_button.clicked.connect(self.add_edge)
 
-        grid.addWidget(self.delete_mode_button, 0, 0, Qt.AlignLeft | Qt.AlignBottom)
-        grid.addWidget(self.add_vertex_mode_button, 0, 1, Qt.AlignLeft | Qt.AlignBottom)
-        grid.addWidget(self.add_edge_mode_button, 0, 2, Qt.AlignLeft | Qt.AlignBottom)
-        grid.setColumnStretch(3, 1)
-        grid.setSpacing(0)
-        grid.setContentsMargins(0, 0, 0, 0)
+        self.previous_mode = None
+
+        add_edge_mode_label = QLabel(self)
+        delete_mode_label = QLabel(self)
+        add_edge_mode_label.setText("ADD VERTEX MODE ENABLED")
+        add_edge_mode_label.setVisible(False)
+        delete_mode_label.setText("DELETE MODE ENABLED")
+        delete_mode_label.setVisible(False)
+        self.mode_labels = {
+            "Add Vertex": add_edge_mode_label,
+            "Delete Vertex/Edge": delete_mode_label
+        }
+
+        self.grid.addWidget(add_edge_mode_label, 0, 0, 1, 2, Qt.AlignLeft | Qt.AlignTop)
+        self.grid.addWidget(delete_mode_label, 0, 0, 1, 2, Qt.AlignLeft | Qt.AlignTop)
+        self.grid.addWidget(self.add_vertex_mode_button, 1, 0, Qt.AlignLeft | Qt.AlignBottom)
+        self.grid.addWidget(self.add_edge_mode_button, 1, 1, Qt.AlignLeft | Qt.AlignBottom)
+        self.grid.addWidget(self.delete_mode_button, 1, 2, Qt.AlignLeft | Qt.AlignBottom)
+
+        self.grid.setColumnStretch(3, 1)
+        self.grid.setSpacing(0)
+        self.grid.setContentsMargins(0, 0, 0, 0)
 
     def create_vertex(self, node):
         # Create a QGraphicsTextItem to hold the node index
         text = QGraphicsTextItem(str(node.id))
-
         # Create a vertex to represent the node
         vertex = Vertex(node)
         # vertex.deleted.connect(self.delete_vertex)
@@ -205,10 +221,14 @@ class MainWindow(QMainWindow):
         return line
 
     def add_edge(self):
+        if self.previous_mode is not None:
+            modes[self.previous_mode] = False
+            self.mode_labels[self.previous_mode].setVisible(False)
+
         # create a new dialog window
         dialog = QDialog(self)
         dialog.setWindowTitle("Add Edge")
-        dialog.setGeometry(300,300,300,100)
+        dialog.setGeometry(300, 300, 300, 100)
         dialog.setModal(True)
 
         # create labels and text inputs for origin and end vertices
@@ -286,7 +306,16 @@ class MainWindow(QMainWindow):
 
     def buttons_handler(self):
         button_type = self.sender().text()
-        modes[button_type] = not modes[button_type]
+        if button_type == self.previous_mode:
+            modes[button_type] = not modes[button_type]
+            self.mode_labels[button_type].setVisible(not self.mode_labels[button_type].isVisible())
+        else:
+            if self.previous_mode is not None:
+                modes[self.previous_mode] = False
+                self.mode_labels[self.previous_mode].setVisible(False)
+            self.previous_mode = button_type
+            modes[button_type] = True
+            self.mode_labels[button_type].setVisible(True)
 
 
 if __name__ == "__main__":
