@@ -329,6 +329,8 @@ class MainWindow(QMainWindow):
                     QMessageBox.warning(dialog, "Warning", "Wrong filename, use only letters, numbers, signs like '_-,.'")
                     return
             graph_save(self.nodes, filename)
+            dialog.close()
+            return
                 
         dialog = QDialog(self)
         dialog.setWindowTitle("Saving to file")
@@ -363,6 +365,11 @@ class MainWindow(QMainWindow):
             except FileReadError as e:
                 QMessageBox.warning(dialog, f"Error {e.__class__.__name__}", str(e))
                 return
+            except FileNotFoundError as e:
+                QMessageBox.warning(dialog, f"Error {e.__class__.__name__}", str(e))
+                return
+            dialog.close()
+            return
                 
         dialog = QDialog(self)
         dialog.setWindowTitle("Loading from file")
@@ -382,6 +389,7 @@ class MainWindow(QMainWindow):
 
         dialog.setLayout(layout)
         dialog.exec_()
+
 
     def buttons_handler(self):
         button_type = self.sender().text()
