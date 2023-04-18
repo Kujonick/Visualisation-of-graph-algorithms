@@ -1,8 +1,8 @@
-#
 import sys
-from graphs import Node
+from graphs import Node, Edge
 from PyQt5.QtWidgets import QApplication, QMainWindow, QGraphicsScene, QGraphicsView, QGraphicsTextItem, \
-    QGraphicsEllipseItem, QGraphicsLineItem, QGraphicsItem, QGraphicsPolygonItem, QPushButton, QGridLayout, QWidget
+    QGraphicsEllipseItem, QGraphicsLineItem, QGraphicsItem, QGraphicsPolygonItem, QPushButton, QGridLayout, QWidget, \
+    QDialog, QLabel, QLineEdit, QVBoxLayout, QMessageBox
 from PyQt5.QtGui import QPen, QBrush, QColor, QPolygonF, QTransform, QPainter
 from PyQt5.QtCore import Qt, QPointF, QLineF, QEvent, QObject, pyqtSignal, pyqtSlot
 
@@ -10,6 +10,7 @@ modes = {
     "Add Vertex": False,
     "Delete Vertex/Edge": False
 }
+
 
 class Vertex(QGraphicsEllipseItem):
     def __init__(self, node):
@@ -91,7 +92,6 @@ class GraphicsScene(QGraphicsScene):
     def mousePressEvent(self, event):
         super().mousePressEvent(event)
         if event.button() == Qt.LeftButton and modes["Add Vertex"]:
-
             self.vertex_add_sig.emit((event.scenePos().x() - 17, event.scenePos().y() - 17))
 
 
@@ -120,7 +120,7 @@ class MainWindow(QMainWindow):
         # example nodes
         nodes = [Node(0, 100, 100), Node(1, 200, 200), Node(2, 300, 100)]
         nodes[0].connect(nodes[1], False)
-        nodes[0].connect(nodes[2], False)
+        #nodes[0].connect(nodes[2], False)
         nodes[2].connect(nodes[1], False)
 
         # Create a dictionary to store vertex objects
@@ -142,9 +142,12 @@ class MainWindow(QMainWindow):
         self.delete_mode_button.clicked.connect(self.buttons_handler)
         self.add_vertex_mode_button = QPushButton("Add Vertex", self)
         self.add_vertex_mode_button.clicked.connect(self.buttons_handler)
+        self.add_edge_mode_button = QPushButton("Add Edge", self)
+        self.add_edge_mode_button.clicked.connect(self.add_edge)
 
         grid.addWidget(self.delete_mode_button, 0, 0, Qt.AlignLeft | Qt.AlignBottom)
         grid.addWidget(self.add_vertex_mode_button, 0, 1, Qt.AlignLeft | Qt.AlignBottom)
+        grid.addWidget(self.add_edge_mode_button, 0, 2, Qt.AlignLeft | Qt.AlignBottom)
         grid.setColumnStretch(3, 1)
         grid.setSpacing(0)
         grid.setContentsMargins(0, 0, 0, 0)
@@ -178,7 +181,6 @@ class MainWindow(QMainWindow):
         node = Node(available_id, position[0], position[1])
         self.scene.addItem(self.create_vertex(node))
 
-
     def create_edge(self, edge):
         # Create an edge to represent the connection between two vertices
         origin_vertex = self.vertices[edge.origin.id]
@@ -201,6 +203,86 @@ class MainWindow(QMainWindow):
 
         # Return the edge
         return line
+
+    def add_edge(self):
+        # create a new dialog window
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Add Edge")
+        dialog.setGeometry(300,300,300,100)
+        dialog.setModal(True)
+
+        # create labels and text inputs for origin and end vertices
+        origin_label = QLabel("Origin:")
+        origin_input = QLineEdit()
+        end_label = QLabel("End:")
+        end_input = QLineEdit()
+
+        # create button to connect vertices
+        connect_button = QPushButton("Connect")
+
+        # layout for the dialog window
+        layout = QVBoxLayout()
+        layout.addWidget(origin_label)
+        layout.addWidget(origin_input)
+        layout.addWidget(end_label)
+        layout.addWidget(end_input)
+        layout.addWidget(connect_button)
+        dialog.setLayout(layout)
+
+        def connect_vertices():
+            # get the origin and end vertices from the input fields
+            origin_id = origin_input.text()
+            end_id = end_input.text()
+
+            # check if the input fields are not empty
+            if not origin_id or not end_id:
+                QMessageBox.warning(dialog, "Warning", "Please enter values for both origin and end vertices.")
+                return
+
+            origin_id = int(origin_id)
+            end_id = int(end_id)
+
+            # check if the origin and end vertices exist in the graph
+            if self.vertices.get(origin_id, -1) == -1 or self.vertices.get(end_id, -1) == -1:
+                QMessageBox.warning(dialog, "Warning", "One or both of the vertices do not exist in the graph.")
+                return
+
+            origin = self.vertices[origin_id]
+            end = self.vertices[end_id]
+
+            # check if origin is the same vertex as end
+            if origin == end:
+                QMessageBox.warning(dialog, "Warning", "Program does not support multigraphs - loops are not allowed.")
+                return
+
+            # check if there is already an edge between the vertices
+            for edge in origin.edges:
+                if edge.end == end:
+                    QMessageBox.warning(dialog, "Warning", "There is already an edge between these vertices.\
+                    Program does not support multigraphs")
+                    return
+
+            # create the edge
+            edge = Connection(origin, end, False)
+
+            # Set the pen for the edge
+            pen = QPen(Qt.black)
+            pen.setWidth(2)
+            edge.setPen(pen)
+
+            # Add edge to the scene and update edges lists in origin and end
+            self.scene.addItem(edge)
+            origin.add_connection(edge)
+            end.add_connection(edge)
+
+            # close the dialog window
+            dialog.accept()
+
+        # Connect the button
+        connect_button.clicked.connect(connect_vertices)
+
+        # Show
+        dialog.exec_()
 
     def buttons_handler(self):
         button_type = self.sender().text()
