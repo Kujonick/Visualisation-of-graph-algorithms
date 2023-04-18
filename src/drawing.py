@@ -1,11 +1,14 @@
 import sys
-from graphs import Node
 from PyQt5.QtWidgets import QApplication, QMainWindow, QGraphicsScene, QGraphicsView, QGraphicsTextItem, \
     QGraphicsEllipseItem, QGraphicsLineItem, QPushButton, QGridLayout, QDialog, QLabel, QLineEdit, QVBoxLayout, \
     QMessageBox
 from PyQt5.QtGui import QPen, QBrush, QColor, QPainter
 from PyQt5.QtCore import Qt, QPointF, QLineF, pyqtSignal, pyqtSlot
+from typing import List
 
+from graphs import Node
+from savers import graph_save, graph_read
+from errors import FileReadError
 modes = {
     "Add Vertex": False,
     "Delete Vertex/Edge": False
@@ -101,6 +104,8 @@ class MainWindow(QMainWindow):
 
         # Initialize Graph #
 
+        # main list of all nodes
+        self.nodes: List[Node] = []
         # Create a QGraphicsScene to hold the nodes and connect signals
         self.scene = GraphicsScene()
         self.scene.vertex_deleted_sig.connect(self.delete_vertex)
@@ -118,6 +123,7 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(self.view)
 
         # example nodes
+        self.nodes.extend([Node(0, 100, 100), Node(1, 200, 200), Node(2, 300, 100)])
         nodes = [Node(0, 100, 100), Node(1, 200, 200), Node(2, 300, 100)]
         nodes[0].connect(nodes[1], False)
         # nodes[0].connect(nodes[2], False)
@@ -146,6 +152,11 @@ class MainWindow(QMainWindow):
         self.add_edge_mode_button = QPushButton("Add Edge", self)
         self.add_edge_mode_button.clicked.connect(self.add_edge)
 
+        self.save_graph_button = QPushButton("Save to file", self)
+        self.save_graph_button.clicked.connect(self.save_to_file)
+        self.load_graph_button = QPushButton("Load to file", self)
+        self.load_graph_button.clicked.connect(self.load_from_file)
+
         self.previous_mode = None
 
         add_edge_mode_label = QLabel(self)
@@ -164,6 +175,10 @@ class MainWindow(QMainWindow):
         self.grid.addWidget(self.add_vertex_mode_button, 1, 0, Qt.AlignLeft | Qt.AlignBottom)
         self.grid.addWidget(self.add_edge_mode_button, 1, 1, Qt.AlignLeft | Qt.AlignBottom)
         self.grid.addWidget(self.delete_mode_button, 1, 2, Qt.AlignLeft | Qt.AlignBottom)
+
+        self.grid.addWidget(self.save_graph_button, 1, 8, Qt.AlignRight | Qt.AlignBottom)
+        self.grid.addWidget(self.load_graph_button, 1, 9, Qt.AlignRight | Qt.AlignBottom)
+
 
         self.grid.setColumnStretch(3, 1)
         self.grid.setSpacing(0)
@@ -302,6 +317,70 @@ class MainWindow(QMainWindow):
         connect_button.clicked.connect(connect_vertices)
 
         # Show
+        dialog.exec_()
+    
+    # Saves .nodes to file named by user
+    def save_to_file(self):
+
+        def saving_button():
+            filename = filename_input.text()
+            for sign in '#%&*{/\\}?:@:"\'!`|=+<>':
+                if sign in filename:
+                    QMessageBox.warning(dialog, "Warning", "Wrong filename, use only letters, numbers, signs like '_-,.'")
+                    return
+            graph_save(self.nodes, filename)
+                
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Saving to file")
+        dialog.setGeometry(300, 300, 300, 100)
+        dialog.setModal(True)
+
+        filename_label = QLabel("Filename (recomended .txt):")
+        filename_input = QLineEdit()
+        confirm_button = QPushButton("Save")
+
+        layout = QVBoxLayout()
+        layout.addWidget(filename_label)
+        layout.addWidget(filename_input)
+
+        layout.addWidget(confirm_button)
+        confirm_button.clicked.connect(saving_button)
+
+        dialog.setLayout(layout)
+        dialog.exec_()
+
+    # Loads .nodes from file given by user
+    def load_from_file(self):
+
+        def loading_button():
+            filename = filename_input.text()
+            for sign in '#%&*{/\\}?:@:"\'!`|=+<>':
+                if sign in filename:
+                    QMessageBox.warning(dialog, "Warning", "Wrong filename, use only letters, numbers, signs like '_-,.'")
+                    return
+            try: 
+                self.nodes = graph_read(filename)
+            except FileReadError as e:
+                QMessageBox.warning(dialog, f"Error {e.__class__.__name__}", str(e))
+                return
+                
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Loading from file")
+        dialog.setGeometry(300, 300, 300, 100)
+        dialog.setModal(True)
+
+        filename_label = QLabel("Filename: ")
+        filename_input = QLineEdit()
+        confirm_button = QPushButton("Load")
+
+        layout = QVBoxLayout()
+        layout.addWidget(filename_label)
+        layout.addWidget(filename_input)
+
+        layout.addWidget(confirm_button)
+        confirm_button.clicked.connect(loading_button)
+
+        dialog.setLayout(layout)
         dialog.exec_()
 
     def buttons_handler(self):
