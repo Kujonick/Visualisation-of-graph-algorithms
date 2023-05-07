@@ -1,12 +1,12 @@
 from errors import WrongTypeConnect
-
+from typing import List, Dict
 class Node:
 
     def __init__(self, id : int, x : float, y : float) -> None:
         self.x = x          # Node position
         self.y = y          # (x,y)
         self.id = id        # identyfication number (one and only one for a graph)
-        self.edges = dict()
+        self.edges : Dict[int : Edge] = dict()
         self.v = None       
 
     def __eq__(self, other) -> bool:

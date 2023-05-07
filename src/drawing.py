@@ -4,7 +4,7 @@ from PyQt5.QtWidgets import QApplication, QMainWindow, QGraphicsScene, QGraphics
     QMessageBox
 from PyQt5.QtGui import QPen, QBrush, QColor, QPainter
 from PyQt5.QtCore import Qt, QPointF, QLineF, pyqtSignal, pyqtSlot
-from typing import List
+from typing import List, Dict
 
 from graphs import Node
 from savers import graph_save, graph_read
@@ -64,7 +64,7 @@ class Vertex(QGraphicsEllipseItem):
 
 class Connection(QGraphicsLineItem):
     def __init__(self, origin, end, directed):
-        super().__init__(origin.initial_x + 17, origin.initial_y + 17, end.initial_x + 17, end.initial_y + 17)
+        super().__init__(origin.initial_x + 17 + origin.x(), origin.initial_y + 17+ origin.y(), end.initial_x + 17+ end.x(), end.initial_y + 17+ end.y())
         self.origin = origin
         self.end = end
         self.directed = directed
@@ -130,7 +130,7 @@ class MainWindow(QMainWindow):
         nodes[2].connect(nodes[1], False)
 
         # Create a dictionary to store vertex objects
-        self.vertices = {}
+        self.vertices : Dict[int : Vertex] = {}
 
         # Add the nodes to the scene
         for node in nodes:
@@ -210,7 +210,9 @@ class MainWindow(QMainWindow):
     def add_vertex(self, position):
         available_id = max(list(self.vertices.keys())) + 1
         node = Node(available_id, position[0], position[1])
-        self.scene.addItem(self.create_vertex(node))
+        vertex = self.create_vertex(node)
+        self.vertices[node.id] = vertex
+        self.scene.addItem(vertex)
 
     def create_edge(self, edge):
         # Create an edge to represent the connection between two vertices
@@ -310,6 +312,8 @@ class MainWindow(QMainWindow):
             origin.add_connection(edge)
             end.add_connection(edge)
 
+            # connecting nodes
+            origin.node.connect(end.node, True)
             # close the dialog window
             dialog.accept()
 
@@ -328,7 +332,7 @@ class MainWindow(QMainWindow):
                 if sign in filename:
                     QMessageBox.warning(dialog, "Warning", "Wrong filename, use only letters, numbers, signs like '_-,.'")
                     return
-            graph_save(self.nodes, filename)
+            graph_save([v.node for v in self.vertices.values()], filename)
             dialog.close()
             return
                 
@@ -361,7 +365,24 @@ class MainWindow(QMainWindow):
                     QMessageBox.warning(dialog, "Warning", "Wrong filename, use only letters, numbers, signs like '_-,.'")
                     return
             try: 
-                self.nodes = graph_read(filename)
+                nodes : list[Node] = graph_read(filename)
+                vertices : list[Vertex] = [x for x in self.vertices.values()]
+                for x in vertices:
+                    for edge in x.edges:
+                        self.scene.removeItem(edge)
+                    self.scene.removeItem(x)
+                    self.delete_vertex(x.node.id)
+                self.vertices = {}
+                for n in nodes:
+                    vertex = self.create_vertex(n)
+                    self.vertices[n.id] = vertex
+                    self.scene.addItem(vertex)
+                for node in nodes:
+                    for edge in node.edges.values():
+                        if not edge.directed and node != edge.origin:
+                            continue
+                        self.scene.addItem(self.create_edge(edge))
+
             except FileReadError as e:
                 QMessageBox.warning(dialog, f"Error {e.__class__.__name__}", str(e))
                 return
