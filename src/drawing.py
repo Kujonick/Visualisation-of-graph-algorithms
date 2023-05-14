@@ -30,7 +30,6 @@ class Vertex(QGraphicsEllipseItem):
 
         # Make the vertex movable
         self.setFlag(self.ItemIsMovable)
-
         # Store a reference to the Node object
         self.node = node
 
@@ -61,6 +60,9 @@ class Vertex(QGraphicsEllipseItem):
             self.scene().removeItem(self)
             del self
 
+    def change_color(self, colors : tuple):
+        new_brush = QBrush(QColor(colors[0], colors[1], colors[2]))
+        self.setBrush(new_brush)
 
 class Connection(QGraphicsLineItem):
     def __init__(self, origin, end, directed):

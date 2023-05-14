@@ -7,7 +7,8 @@ class Node:
         self.y = y          # (x,y)
         self.id = id        # identyfication number (one and only one for a graph)
         self.edges : Dict[int : Edge] = dict()
-        self.v = None       
+        self.visited = None # False - not visited, True - visited, None - at this moment
+        self.value = None     
 
     def __eq__(self, other) -> bool:
         if not isinstance(other,Node):
@@ -81,6 +82,11 @@ class Node:
             return True
         return False        
 
+    def change_visited(self, new_state):
+        self.visited = new_state
+    
+    def change_value(self, new_value):
+        self.value = new_value
         
 
 
