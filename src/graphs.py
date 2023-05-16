@@ -8,7 +8,8 @@ class Node:
         self.id = id        # identyfication number (one and only one for a graph)
         self.edges : Dict[int : Edge] = dict()
         self.visited = None # False - not visited, True - visited, None - at this moment
-        self.value = None     
+        self.value = None 
+        self.vertex = None    
 
     def __eq__(self, other) -> bool:
         if not isinstance(other,Node):
@@ -77,8 +78,8 @@ class Node:
         edge = self.get_edge(other)
         if edge != None:    # Edge from self to other exists
             del self.edges[other.id]
-            if not edge.directed:
-                del other.edges[other.id]
+            if other.get_edge(self) != None:
+                del other.edges[self.id]
             return True
         return False        
 
@@ -87,7 +88,10 @@ class Node:
     
     def change_value(self, new_value):
         self.value = new_value
-        
+    
+    def remove(self):
+        del self
+
 
 
 class Edge:
@@ -124,6 +128,7 @@ class Edge:
 
     def remove(self) -> None:
         self.origin.disconnect(self.end)
+        del self
 
     def get_flow(self) -> int:
         return self.flow

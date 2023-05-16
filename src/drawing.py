@@ -6,7 +6,7 @@ from PyQt5.QtGui import QPen, QBrush, QColor, QPainter
 from PyQt5.QtCore import Qt, QPointF, QLineF, pyqtSignal, pyqtSlot
 from typing import List, Dict
 
-from graphs import Node
+from graphs import Node, Edge
 from savers import graph_save, graph_read
 from errors import FileReadError
 modes = {
@@ -16,7 +16,7 @@ modes = {
 
 
 class Vertex(QGraphicsEllipseItem):
-    def __init__(self, node):
+    def __init__(self, node : Node):
         super().__init__(node.x, node.y, 34, 34)
         # Remember initial position of vertex for mouseReleaseEvent
         self.initial_x = node.x
@@ -31,19 +31,36 @@ class Vertex(QGraphicsEllipseItem):
         # Make the vertex movable
         self.setFlag(self.ItemIsMovable)
         # Store a reference to the Node object
-        self.node = node
+        self.node : Node = node
+        node.vertex = self
 
         # Store edges of the Vertex
-        self.edges = []
+        self.connections = []
 
         # Set signal in case of removal
+    
+    def __eq__(self, other):
+        if not isinstance(other,Vertex):
+            return False
+        return self.node == other.node
+
+    def __hash__(self) -> int:
+        return hash(self.node)*13
+    
+    def __str__(self):
+        return f"Vert {str(self.node)}"
+
+    def show(self):
+        for conn in self.connections:
+            print(conn)
+        print(self)
 
     def add_connection(self, edge):
-        self.edges.append(edge)
+        self.connections.append(edge)
 
     def mouseMoveEvent(self, event):
         super().mouseMoveEvent(event)
-        for edge in self.edges:
+        for edge in self.connections:
             edge.adjust()
 
         self.node.update_position(self.initial_x + self.x(), self.initial_y + self.y())
@@ -51,26 +68,42 @@ class Vertex(QGraphicsEllipseItem):
     def mousePressEvent(self, event):
         super().mousePressEvent(event)
         if event.button() == Qt.LeftButton and modes["Delete Vertex/Edge"]:
-            for edge in self.edges:
-                self.scene().removeItem(edge)
-                del edge
+            self.remove()
 
-            self.edges.clear()
-            self.scene().vertex_deleted_sig.emit(self.node.id)
-            self.scene().removeItem(self)
-            del self
+    def remove(self):
+        print('USUWANIE')
+        self.show()#
+        for edge in self.connections[::-1]:
+            print('usuwanie',edge)
+            edge.remove()
+        self.show()#
+        self.connections.clear()
+        self.scene().vertex_deleted_sig.emit(self.node.id)
+        self.scene().removeItem(self)
+        del self
 
     def change_color(self, colors : tuple):
         new_brush = QBrush(QColor(colors[0], colors[1], colors[2]))
         self.setBrush(new_brush)
 
 class Connection(QGraphicsLineItem):
-    def __init__(self, origin, end, directed):
+    def __init__(self, origin, end, directed, edge = None):
         super().__init__(origin.initial_x + 17 + origin.x(), origin.initial_y + 17+ origin.y(), end.initial_x + 17+ end.x(), end.initial_y + 17+ end.y())
-        self.origin = origin
-        self.end = end
+        self.origin : Vertex = origin
+        self.end : Vertex = end
         self.directed = directed
         self.arrowhead = None
+        self.edge : Edge = edge
+
+    def __eq__(self, other):
+        if not isinstance(other,Connection):
+            return False
+        return other.edge == self.edge
+
+    def __hash__(self) -> int:
+        return hash(self.edge)*11
+    def __str__(self):
+        return f"Conn {str(self.edge)}"
 
     def adjust(self):
         start_pos = QPointF(self.origin.initial_x + self.origin.x() + 17, self.origin.initial_y + self.origin.y() + 17)
@@ -81,10 +114,16 @@ class Connection(QGraphicsLineItem):
     def mousePressEvent(self, event):
         super().mousePressEvent(event)
         if event.button() == Qt.LeftButton and modes["Delete Vertex/Edge"]:
-            self.origin.edges.remove(self)
-            self.end.edges.remove(self)
-            self.scene().removeItem(self)
-            del self
+            # self.origin.connections.remove(self)
+            # self.end.connections.remove(self)
+            self.remove()
+    
+    def remove(self):
+        self.origin.connections.remove(self)
+        self.end.connections.remove(self)
+        self.edge.remove()
+        self.scene().removeItem(self)
+        del self
 
 
 class GraphicsScene(QGraphicsScene):
@@ -137,10 +176,14 @@ class MainWindow(QMainWindow):
         # Add the nodes to the scene
         for node in nodes:
             vertex = self.create_vertex(node)
+            self.vertices[node.id] = vertex
             self.scene.addItem(vertex)
+        edges = set()
         for node in nodes:
             for edge in node.edges.values():
-                self.scene.addItem(self.create_edge(edge))
+                edges.add(edge)
+        for edge in edges:
+            self.scene.addItem(self.create_edge(edge))
 
         # Initialize UI #
 
@@ -210,7 +253,7 @@ class MainWindow(QMainWindow):
 
     @pyqtSlot(tuple)
     def add_vertex(self, position):
-        available_id = max(list(self.vertices.keys())) + 1
+        available_id = max(list(self.vertices.keys())) + 1 if len(self.vertices) > 0 else 0
         node = Node(available_id, position[0], position[1])
         vertex = self.create_vertex(node)
         self.vertices[node.id] = vertex
@@ -221,7 +264,7 @@ class MainWindow(QMainWindow):
         origin_vertex = self.vertices[edge.origin.id]
         end_vertex = self.vertices[edge.end.id]
         line = Connection(origin_vertex, end_vertex, edge.directed)
-
+        line.edge = edge
         # Set the pen for the edge
         pen = QPen(Qt.black)
         pen.setWidth(2)
@@ -286,8 +329,8 @@ class MainWindow(QMainWindow):
                 QMessageBox.warning(dialog, "Warning", "One or both of the vertices do not exist in the graph.")
                 return
 
-            origin = self.vertices[origin_id]
-            end = self.vertices[end_id]
+            origin : Vertex= self.vertices[origin_id]
+            end : Vertex = self.vertices[end_id]
 
             # check if origin is the same vertex as end
             if origin == end:
@@ -295,27 +338,30 @@ class MainWindow(QMainWindow):
                 return
 
             # check if there is already an edge between the vertices
-            for edge in origin.edges:
+            for edge in origin.connections:
                 if edge.end == end:
                     QMessageBox.warning(dialog, "Warning", "There is already an edge between these vertices.\
                     Program does not support multigraphs")
                     return
 
-            # create the edge
-            edge = Connection(origin, end, False)
-
-            # Set the pen for the edge
-            pen = QPen(Qt.black)
-            pen.setWidth(2)
-            edge.setPen(pen)
-
-            # Add edge to the scene and update edges lists in origin and end
-            self.scene.addItem(edge)
-            origin.add_connection(edge)
-            end.add_connection(edge)
-
             # connecting nodes
             origin.node.connect(end.node, True)
+
+            # create the edge
+            edge = origin.node.get_edge(end.node)
+
+            self.scene.addItem(self.create_edge(edge))
+            # # Set the pen for the edge
+            # pen = QPen(Qt.black)
+            # pen.setWidth(2)
+            # edge.setPen(pen)
+
+            # # Add edge to the scene and update edges lists in origin and end
+            # self.scene.addItem(edge)
+            # origin.add_connection(edge)
+            # end.add_connection(edge)
+
+            
             # close the dialog window
             dialog.accept()
 
@@ -370,15 +416,9 @@ class MainWindow(QMainWindow):
                 nodes : list[Node] = graph_read(filename)
                 vertices : list[Vertex] = [x for x in self.vertices.values()]
                 for x in vertices:
-                    for edge in x.edges:
-                        self.scene.removeItem(edge)
-                    self.scene.removeItem(x)
                     self.delete_vertex(x.node.id)
+                    x.remove()
                 self.vertices = {}
-                for n in nodes:
-                    vertex = self.create_vertex(n)
-                    self.vertices[n.id] = vertex
-                    self.scene.addItem(vertex)
                 for node in nodes:
                     for edge in node.edges.values():
                         if not edge.directed and node != edge.origin:
