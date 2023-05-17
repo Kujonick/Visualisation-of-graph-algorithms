@@ -9,7 +9,7 @@ class Node:
         self.edges : Dict[int : Edge] = dict()
         self.visited = None # False - not visited, True - visited, None - at this moment
         self.value = None 
-        self.vertex = None    
+        self.vertex= None    
 
     def __eq__(self, other) -> bool:
         if not isinstance(other,Node):
@@ -84,6 +84,8 @@ class Node:
         return False        
 
     def change_visited(self, new_state):
+        if new_state not in [True, False, None]:
+            raise ValueError(f"Wrong value '{new_state}' for .visited")
         self.visited = new_state
     
     def change_value(self, new_value):

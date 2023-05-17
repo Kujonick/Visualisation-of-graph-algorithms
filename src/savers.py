@@ -1,5 +1,5 @@
 from graphs import Node, Edge
-from typing import List
+from typing import List, Dict
 from errors import FileReadError
 
 #  saves graph to .txt file
@@ -35,11 +35,11 @@ def graph_read(filename : str) -> List[Node]:
         try:
             node_count = int(f.readline().strip())
             line_count = 1
-            list_of_nodes : List[Node]= []
+            list_of_nodes : Dict[int : Node]= {}
             for i in range(node_count):
                 line = f.readline().strip().split()
                 v = Node(int(line[0]), float(line[1]), float(line[2]))
-                list_of_nodes.append(v)
+                list_of_nodes[v.id] = v
                 line_count += 1
 
             for l in f:
@@ -52,7 +52,7 @@ def graph_read(filename : str) -> List[Node]:
                 line_count += 1
         except:
             raise FileReadError(filename, line_count)
-    return list_of_nodes
+    return list_of_nodes.values()
 
 if __name__ == '__main__':
     L = [Node(i, i, 0) for i in range(4)]

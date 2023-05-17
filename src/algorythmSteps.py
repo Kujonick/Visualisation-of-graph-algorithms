@@ -1,13 +1,16 @@
 from typing import List, Any, Tuple
 from graphs import Node, Edge
 
+# algorythm's steps
+# one step = (function, (args), (prev, next))
+
 class AlgorythmSteps:
     def __init__(self) -> None:
         self.steps : List[(function, Any, Any)] = []
         self.index = -1
 
-    def add_step(self, func , previous_state, next_state )-> None:
-        self.steps.append((func, previous_state, next_state))
+    def add_step(self, func , args, states )-> None:
+        self.steps.append((func, args, states))
 
     def pop_step(self) -> None:
         self.steps.pop()
@@ -17,28 +20,24 @@ class AlgorythmSteps:
 
     def next_step(self) -> tuple:
         if self.index < len(self.steps) -1:
-            self.index += 1
-            elem = self.steps[self.index]
-            return (elem[0], elem[2])
+            self.index += 1 
+            return self.steps[self.index]
 
     def to_last(self):
         while self.index < len(self.steps) -1:
             self.index += 1
-            elem = self.steps[self.index]
-            yield (elem[0], elem[2])
+            yield self.steps[self.index]
         return 
 
     def previous_step(self) -> tuple:
         if self.index > -1:
-            elem = self.steps[self.index]
             self.index -= 1
-            return (elem[0], elem[1])
+            return self.steps[self.index+1]
     
     def to_first(self):
         while self.index > -1:
+            yield self.steps[self.index]
             self.index -= 1
-            elem = self.steps[self.index]
-            yield (elem[0], elem[1])
         return 
 
 if __name__ == "__main__":

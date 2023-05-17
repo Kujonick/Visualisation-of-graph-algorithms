@@ -14,6 +14,11 @@ modes = {
     "Delete Vertex/Edge": False
 }
 
+Vertex_Colors = {
+    "visited": (182,182,182),
+    "unvisited": (169, 192, 255),
+}
+
 
 class Vertex(QGraphicsEllipseItem):
     def __init__(self, node : Node):
@@ -24,6 +29,7 @@ class Vertex(QGraphicsEllipseItem):
 
         # Set the pen and brush for the vertex
         pen = QPen(Qt.black)
+        pen.setWidth(2)
         brush = QBrush(QColor(194, 223, 255))
         self.setPen(pen)
         self.setBrush(brush)
@@ -36,6 +42,13 @@ class Vertex(QGraphicsEllipseItem):
 
         # Store edges of the Vertex
         self.connections = []
+        
+        # Text value
+        self.value : QGraphicsTextItem = QGraphicsTextItem('-')
+        self.value.setDefaultTextColor(QColor(255, 0, 0))
+        self.value.setParentItem(self)
+        text_rect = self.value.boundingRect()
+        self.value.setPos(node.x -  text_rect.width() / 2 + 17, node.y - 4 * text_rect.height() / 5 + 17)
 
         # Set signal in case of removal
     
@@ -71,12 +84,9 @@ class Vertex(QGraphicsEllipseItem):
             self.remove()
 
     def remove(self):
-        print('USUWANIE')
-        self.show()#
         for edge in self.connections[::-1]:
-            print('usuwanie',edge)
             edge.remove()
-        self.show()#
+
         self.connections.clear()
         self.scene().vertex_deleted_sig.emit(self.node.id)
         self.scene().removeItem(self)
@@ -86,6 +96,29 @@ class Vertex(QGraphicsEllipseItem):
         new_brush = QBrush(QColor(colors[0], colors[1], colors[2]))
         self.setBrush(new_brush)
 
+    def changed_state(self):
+        if self.node.visited:
+            self.change_color(Vertex_Colors["visited"])
+        else:
+            self.change_color(Vertex_Colors("unvisited"))
+
+    def clear_value(self):
+        self.value.setPlainText('')   
+
+    def changed_value(self):
+        self.value.setPlainText(str(self.node.value)) 
+
+    def set_selected(self):
+        pen = QPen(Qt.red)
+        pen.setWidth(5)
+        self.setPen(pen)
+
+    def set_unselected(self):
+        pen = QPen(Qt.black)
+        pen.setWidth(2)
+        self.setPen(pen)
+
+
 class Connection(QGraphicsLineItem):
     def __init__(self, origin, end, directed, edge = None):
         super().__init__(origin.initial_x + 17 + origin.x(), origin.initial_y + 17+ origin.y(), end.initial_x + 17+ end.x(), end.initial_y + 17+ end.y())
@@ -94,6 +127,9 @@ class Connection(QGraphicsLineItem):
         self.directed = directed
         self.arrowhead = None
         self.edge : Edge = edge
+        pen =QPen(Qt.black)
+        pen.setWidth(2)
+        self.setPen(pen)
 
     def __eq__(self, other):
         if not isinstance(other,Connection):
@@ -125,6 +161,13 @@ class Connection(QGraphicsLineItem):
         self.scene().removeItem(self)
         del self
 
+    def set_selected(self):
+        pen = QPen(Qt.red)
+        self.setPen(pen)
+
+    def set_unselected(self):
+        pen = QPen(Qt.black)
+        self.setPen(pen)
 
 class GraphicsScene(QGraphicsScene):
     vertex_deleted_sig = pyqtSignal(int)
@@ -229,7 +272,7 @@ class MainWindow(QMainWindow):
         self.grid.setSpacing(0)
         self.grid.setContentsMargins(0, 0, 0, 0)
 
-    def create_vertex(self, node):
+    def create_vertex(self, node : Node):
         # Create a QGraphicsTextItem to hold the node index
         text = QGraphicsTextItem(str(node.id))
         # Create a vertex to represent the node
@@ -239,7 +282,7 @@ class MainWindow(QMainWindow):
         # Add the text to the vertex
         text.setParentItem(vertex)
         text_rect = text.boundingRect()
-        text.setPos(node.x - text_rect.width() / 2 + 17, node.y - text_rect.height() / 2 + 17)
+        text.setPos(node.x - text_rect.width() / 2 + 17, node.y - text_rect.height() / 5 + 17)
 
         vertex.setZValue(1)
 
@@ -266,9 +309,7 @@ class MainWindow(QMainWindow):
         line = Connection(origin_vertex, end_vertex, edge.directed)
         line.edge = edge
         # Set the pen for the edge
-        pen = QPen(Qt.black)
-        pen.setWidth(2)
-        line.setPen(pen)
+        # moved to __init__
 
         # if edge is directed - add arrowhead
         '''
@@ -345,7 +386,7 @@ class MainWindow(QMainWindow):
                     return
 
             # connecting nodes
-            origin.node.connect(end.node, True)
+            origin.node.connect(end.node, False)
 
             # create the edge
             edge = origin.node.get_edge(end.node)
@@ -416,12 +457,13 @@ class MainWindow(QMainWindow):
                 nodes : list[Node] = graph_read(filename)
                 vertices : list[Vertex] = [x for x in self.vertices.values()]
                 for x in vertices:
-                    self.delete_vertex(x.node.id)
                     x.remove()
-                self.vertices = {}
+                self.vertices.clear()
+                for node in nodes:
+                    self.scene.addItem(self.create_vertex(node))
                 for node in nodes:
                     for edge in node.edges.values():
-                        if not edge.directed and node != edge.origin:
+                        if edge.directed and node != edge.origin:
                             continue
                         self.scene.addItem(self.create_edge(edge))
 
