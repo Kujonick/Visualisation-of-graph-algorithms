@@ -1,27 +1,37 @@
 import sys
+import math
 from PyQt5.QtWidgets import QApplication, QMainWindow, QGraphicsScene, QGraphicsView, QGraphicsTextItem, \
     QGraphicsEllipseItem, QGraphicsLineItem, QPushButton, QGridLayout, QDialog, QLabel, QLineEdit, QVBoxLayout, \
-    QMessageBox
-from PyQt5.QtGui import QPen, QBrush, QColor, QPainter
+    QMessageBox, QRadioButton, QHBoxLayout, QGroupBox, QComboBox
+from PyQt5.QtGui import QPen, QBrush, QColor, QPainter, QPainterPath, QPolygonF
 from PyQt5.QtCore import Qt, QPointF, QLineF, pyqtSignal, pyqtSlot
 from typing import List, Dict
 
 from graphs import Node, Edge
 from savers import graph_save, graph_read
 from errors import FileReadError
+
 modes = {
     "Add Vertex": False,
     "Delete Vertex/Edge": False
 }
 
+checks = {}
+
+algorithms = {
+    "1": ["algo1", "algo2", "algo3"],
+    "2": ["algo4", "algo5", "algo6"],
+    "3": ["algo7", "algo8", "algo9"]
+}
+
 Vertex_Colors = {
-    "visited": (182,182,182),
+    "visited": (182, 182, 182),
     "unvisited": (169, 192, 255),
 }
 
 
 class Vertex(QGraphicsEllipseItem):
-    def __init__(self, node : Node):
+    def __init__(self, node: Node):
         super().__init__(node.x, node.y, 34, 34)
         # Remember initial position of vertex for mouseReleaseEvent
         self.initial_x = node.x
@@ -37,29 +47,30 @@ class Vertex(QGraphicsEllipseItem):
         # Make the vertex movable
         self.setFlag(self.ItemIsMovable)
         # Store a reference to the Node object
-        self.node : Node = node
+        self.node: Node = node
         node.vertex = self
 
         # Store edges of the Vertex
         self.connections = []
-        
+
         # Text value
-        self.value : QGraphicsTextItem = QGraphicsTextItem('-')
-        self.value.setDefaultTextColor(QColor(255, 0, 0))
-        self.value.setParentItem(self)
-        text_rect = self.value.boundingRect()
-        self.value.setPos(node.x -  text_rect.width() / 2 + 17, node.y - 4 * text_rect.height() / 5 + 17)
+        if checks.get("With Value", False):
+            self.value: QGraphicsTextItem = QGraphicsTextItem('-')
+            self.value.setDefaultTextColor(QColor(255, 0, 0))
+            self.value.setParentItem(self)
+            text_rect = self.value.boundingRect()
+            self.value.setPos(node.x - text_rect.width() / 2 + 15, node.y - 4 * text_rect.height() / 5 + 17)
 
         # Set signal in case of removal
-    
+
     def __eq__(self, other):
-        if not isinstance(other,Vertex):
+        if not isinstance(other, Vertex):
             return False
         return self.node == other.node
 
     def __hash__(self) -> int:
-        return hash(self.node)*13
-    
+        return hash(self.node) * 13
+
     def __str__(self):
         return f"Vert {str(self.node)}"
 
@@ -92,7 +103,7 @@ class Vertex(QGraphicsEllipseItem):
         self.scene().removeItem(self)
         del self
 
-    def change_color(self, colors : tuple):
+    def change_color(self, colors: tuple):
         new_brush = QBrush(QColor(colors[0], colors[1], colors[2]))
         self.setBrush(new_brush)
 
@@ -103,10 +114,10 @@ class Vertex(QGraphicsEllipseItem):
             self.change_color(Vertex_Colors("unvisited"))
 
     def clear_value(self):
-        self.value.setPlainText('')   
+        self.value.setPlainText('')
 
     def changed_value(self):
-        self.value.setPlainText(str(self.node.value)) 
+        self.value.setPlainText(str(self.node.value))
 
     def set_selected(self):
         pen = QPen(Qt.red)
@@ -120,24 +131,41 @@ class Vertex(QGraphicsEllipseItem):
 
 
 class Connection(QGraphicsLineItem):
-    def __init__(self, origin, end, directed, edge = None):
-        super().__init__(origin.initial_x + 17 + origin.x(), origin.initial_y + 17+ origin.y(), end.initial_x + 17+ end.x(), end.initial_y + 17+ end.y())
-        self.origin : Vertex = origin
-        self.end : Vertex = end
+    def __init__(self, origin, end, directed, edge):
+        super().__init__(origin.initial_x + 17 + origin.x(), origin.initial_y + 17 + origin.y(),
+                         end.initial_x + 17 + end.x(), end.initial_y + 17 + end.y())
+        self.origin: Vertex = origin
+        self.end: Vertex = end
         self.directed = directed
         self.arrowhead = None
-        self.edge : Edge = edge
-        pen =QPen(Qt.black)
+        self.edge: Edge = edge
+        pen = QPen(Qt.black)
         pen.setWidth(2)
         self.setPen(pen)
 
+        if checks.get("Weighted", False):
+            self.weight_text = QGraphicsTextItem(self)
+            if self.edge is not None and self.edge.cost is not None:
+                self.weight_text.setPlainText(str(self.edge.cost))
+            else:
+                self.weight_text.setPlainText("1")
+            self.weight_text.setDefaultTextColor(Qt.black)
+            # Calculate the position of the weight text
+            angle = math.atan2(self.line().dy(), self.line().dx())
+            offset = 15
+            text_x = self.line().center().x() + offset * math.sin(angle)
+            text_y = self.line().center().y() - offset * math.cos(angle)
+            self.weight_text.setPos(text_x - self.weight_text.boundingRect().width() / 2,
+                                    text_y - self.weight_text.boundingRect().height() / 2)
+
     def __eq__(self, other):
-        if not isinstance(other,Connection):
+        if not isinstance(other, Connection):
             return False
         return other.edge == self.edge
 
     def __hash__(self) -> int:
-        return hash(self.edge)*11
+        return hash(self.edge) * 11
+
     def __str__(self):
         return f"Conn {str(self.edge)}"
 
@@ -147,13 +175,22 @@ class Connection(QGraphicsLineItem):
         line = QLineF(start_pos, end_pos)
         self.setLine(line)
 
+        if checks.get("Weighted", False):
+            # Calculate the position of the weight text
+            angle = math.atan2(line.dy(), line.dx())
+            offset = 15
+            text_x = self.line().center().x() + offset * math.sin(angle)
+            text_y = self.line().center().y() - offset * math.cos(angle)
+            self.weight_text.setPos(text_x - self.weight_text.boundingRect().width() / 2,
+                                    text_y - self.weight_text.boundingRect().height() / 2)
+
     def mousePressEvent(self, event):
         super().mousePressEvent(event)
         if event.button() == Qt.LeftButton and modes["Delete Vertex/Edge"]:
             # self.origin.connections.remove(self)
             # self.end.connections.remove(self)
             self.remove()
-    
+
     def remove(self):
         self.origin.connections.remove(self)
         self.end.connections.remove(self)
@@ -168,6 +205,7 @@ class Connection(QGraphicsLineItem):
     def set_unselected(self):
         pen = QPen(Qt.black)
         self.setPen(pen)
+
 
 class GraphicsScene(QGraphicsScene):
     vertex_deleted_sig = pyqtSignal(int)
@@ -185,6 +223,11 @@ class GraphicsScene(QGraphicsScene):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
+
+        # Run Starting Window
+        self.starting_window()
+        if not checks:
+            sys.exit()
 
         # Initialize Graph #
 
@@ -214,7 +257,7 @@ class MainWindow(QMainWindow):
         nodes[2].connect(nodes[1], False)
 
         # Create a dictionary to store vertex objects
-        self.vertices : Dict[int : Vertex] = {}
+        self.vertices: Dict[int: Vertex] = {}
 
         # Add the nodes to the scene
         for node in nodes:
@@ -240,6 +283,9 @@ class MainWindow(QMainWindow):
         self.add_edge_mode_button = QPushButton("Add Edge", self)
         self.add_edge_mode_button.clicked.connect(self.add_edge)
 
+        self.algorithm_button = QPushButton("Algorithms...", self)
+        self.algorithm_button.clicked.connect(self.run_algorithm)
+
         self.save_graph_button = QPushButton("Save to file", self)
         self.save_graph_button.clicked.connect(self.save_to_file)
         self.load_graph_button = QPushButton("Load to file", self)
@@ -263,26 +309,30 @@ class MainWindow(QMainWindow):
         self.grid.addWidget(self.add_vertex_mode_button, 1, 0, Qt.AlignLeft | Qt.AlignBottom)
         self.grid.addWidget(self.add_edge_mode_button, 1, 1, Qt.AlignLeft | Qt.AlignBottom)
         self.grid.addWidget(self.delete_mode_button, 1, 2, Qt.AlignLeft | Qt.AlignBottom)
-
+        self.grid.addWidget(self.algorithm_button, 1, 3, Qt.AlignBottom)
         self.grid.addWidget(self.save_graph_button, 1, 8, Qt.AlignRight | Qt.AlignBottom)
         self.grid.addWidget(self.load_graph_button, 1, 9, Qt.AlignRight | Qt.AlignBottom)
-
 
         self.grid.setColumnStretch(3, 1)
         self.grid.setSpacing(0)
         self.grid.setContentsMargins(0, 0, 0, 0)
 
-    def create_vertex(self, node : Node):
+    def create_vertex(self, node: Node):
         # Create a QGraphicsTextItem to hold the node index
         text = QGraphicsTextItem(str(node.id))
         # Create a vertex to represent the node
         vertex = Vertex(node)
+        if node.value is not None:
+            vertex.changed_value()
         # vertex.deleted.connect(self.delete_vertex)
 
         # Add the text to the vertex
         text.setParentItem(vertex)
         text_rect = text.boundingRect()
-        text.setPos(node.x - text_rect.width() / 2 + 17, node.y - text_rect.height() / 5 + 17)
+        if checks.get("With Value", False):
+            text.setPos(node.x - text_rect.width() / 2 + 17, node.y - text_rect.height() / 4 + 17)
+        else:
+            text.setPos(node.x - text_rect.width() / 2 + 17, node.y - text_rect.height() / 2 + 17)
 
         vertex.setZValue(1)
 
@@ -298,6 +348,37 @@ class MainWindow(QMainWindow):
     def add_vertex(self, position):
         available_id = max(list(self.vertices.keys())) + 1 if len(self.vertices) > 0 else 0
         node = Node(available_id, position[0], position[1])
+        if checks.get("With Value", False):
+            dialog = QDialog(self)
+            dialog.setWindowTitle("Set vertex value")
+            dialog.setGeometry(300, 300, 300, 100)
+            dialog.setModal(True)
+
+            value_label = QLabel("Value:")
+            value_input = QLineEdit()
+
+            create_button = QPushButton("Create Vertex")
+
+            # layout for the dialog window
+            layout = QVBoxLayout()
+            layout.addWidget(value_label)
+            layout.addWidget(value_input)
+            layout.addWidget(create_button)
+            dialog.setLayout(layout)
+
+            def set_vertex_value():
+                value = value_input.text()
+
+                if not value:
+                    QMessageBox.warning(dialog, "Warning", "Please enter value for vertex.")
+                    return
+
+                node.change_value(value)
+                dialog.accept()
+
+            create_button.clicked.connect(set_vertex_value)
+            dialog.exec_()
+
         vertex = self.create_vertex(node)
         self.vertices[node.id] = vertex
         self.scene.addItem(vertex)
@@ -306,8 +387,9 @@ class MainWindow(QMainWindow):
         # Create an edge to represent the connection between two vertices
         origin_vertex = self.vertices[edge.origin.id]
         end_vertex = self.vertices[edge.end.id]
-        line = Connection(origin_vertex, end_vertex, edge.directed)
-        line.edge = edge
+        line = Connection(origin_vertex, end_vertex, edge.directed, edge)
+
+        # text_rect = text.boundingRect()
         # Set the pen for the edge
         # moved to __init__
 
@@ -339,6 +421,8 @@ class MainWindow(QMainWindow):
         origin_input = QLineEdit()
         end_label = QLabel("End:")
         end_input = QLineEdit()
+        weight_label = QLabel("Weight:")
+        weight_input = QLineEdit()
 
         # create button to connect vertices
         connect_button = QPushButton("Connect")
@@ -349,6 +433,10 @@ class MainWindow(QMainWindow):
         layout.addWidget(origin_input)
         layout.addWidget(end_label)
         layout.addWidget(end_input)
+        if checks.get("Weighted", False):
+            layout.addWidget(weight_label)
+            layout.addWidget(weight_input)
+
         layout.addWidget(connect_button)
         dialog.setLayout(layout)
 
@@ -356,6 +444,7 @@ class MainWindow(QMainWindow):
             # get the origin and end vertices from the input fields
             origin_id = origin_input.text()
             end_id = end_input.text()
+            weight = weight_input.text()
 
             # check if the input fields are not empty
             if not origin_id or not end_id:
@@ -370,8 +459,8 @@ class MainWindow(QMainWindow):
                 QMessageBox.warning(dialog, "Warning", "One or both of the vertices do not exist in the graph.")
                 return
 
-            origin : Vertex= self.vertices[origin_id]
-            end : Vertex = self.vertices[end_id]
+            origin: Vertex = self.vertices[origin_id]
+            end: Vertex = self.vertices[end_id]
 
             # check if origin is the same vertex as end
             if origin == end:
@@ -382,11 +471,18 @@ class MainWindow(QMainWindow):
             for edge in origin.connections:
                 if edge.end == end:
                     QMessageBox.warning(dialog, "Warning", "There is already an edge between these vertices.\
-                    Program does not support multigraphs")
+                    Program does not support multigraphs.")
                     return
 
+            if checks.get("Weighted", False) and not weight:
+                QMessageBox.warning(dialog, "Warning", "Please enter the weight of the edge.")
+                return
+
             # connecting nodes
-            origin.node.connect(end.node, False)
+            if checks.get("Weighted", False):
+                origin.node.connect(end.node, False, None, None, int(weight))
+            else:
+                origin.node.connect(end.node, False)
 
             # create the edge
             edge = origin.node.get_edge(end.node)
@@ -402,7 +498,6 @@ class MainWindow(QMainWindow):
             # origin.add_connection(edge)
             # end.add_connection(edge)
 
-            
             # close the dialog window
             dialog.accept()
 
@@ -411,7 +506,131 @@ class MainWindow(QMainWindow):
 
         # Show
         dialog.exec_()
-    
+
+    def starting_window(self):
+        # create a new dialog window
+        edge_options = ["Unweighted", "Weighted", "Flow"]
+        node_options = ["No Value", "With Value"]
+        direction_options = ["Undirected", "Directed"]
+
+        edge_options_checklist = []
+        node_options_checklist = []
+        direction_options_checklist = []
+
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Create new graph")
+        dialog.setGeometry(300, 300, 300, 100)
+        dialog.setModal(True)
+
+        layout = QVBoxLayout()
+        checklists_layout = QHBoxLayout()
+
+        checklist_direction_group_box = QGroupBox()
+        checklist_direction_layout = QVBoxLayout()
+        checklist_direction_layout.addWidget(QLabel("Direction"))
+        first = True
+        for option in direction_options:
+            radio_button = QRadioButton(option)
+            if first:
+                radio_button.setChecked(True)
+                first = False
+            checklist_direction_layout.addWidget(radio_button)
+            direction_options_checklist.append(radio_button)
+        checklist_direction_group_box.setLayout(checklist_direction_layout)
+
+        checklist_edges_group_box = QGroupBox()
+        checklist_edges_layout = QVBoxLayout()
+        checklist_edges_layout.addWidget(QLabel("Edges Weights"))
+        first = True
+        for option in edge_options:
+            radio_button = QRadioButton(option)
+            if first:
+                radio_button.setChecked(True)
+                first = False
+            checklist_edges_layout.addWidget(radio_button)
+            edge_options_checklist.append(radio_button)
+        checklist_edges_group_box.setLayout(checklist_edges_layout)
+
+        checklist_nodes_group_box = QGroupBox()
+        checklist_nodes_layout = QVBoxLayout()
+        checklist_nodes_layout.addWidget(QLabel("Nodes Values"))
+        first = True
+        for option in node_options:
+            radio_button = QRadioButton(option)
+            if first:
+                radio_button.setChecked(True)
+                first = False
+            checklist_nodes_layout.addWidget(radio_button)
+            node_options_checklist.append(radio_button)
+        checklist_nodes_group_box.setLayout(checklist_nodes_layout)
+
+        create_button = QPushButton("Create Graph")
+
+        def create_graph():
+            for check in direction_options_checklist:
+                if check.isChecked():
+                    checks[check.text()] = True
+            for check in edge_options_checklist:
+                if check.isChecked():
+                    checks[check.text()] = True
+            for check in node_options_checklist:
+                if check.isChecked():
+                    checks[check.text()] = True
+
+            dialog.accept()
+
+        create_button.clicked.connect(create_graph)
+
+        checklists_layout.addWidget(checklist_direction_group_box)
+        checklists_layout.addWidget(checklist_edges_group_box)
+        checklists_layout.addWidget(checklist_nodes_group_box)
+        layout.addLayout(checklists_layout)
+        layout.addWidget(create_button)
+
+        dialog.setLayout(layout)
+        dialog.exec_()
+
+    def run_algorithm(self):
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Run Algorithm")
+        dialog.setGeometry(300, 300, 300, 100)
+        dialog.setModal(True)
+
+        layout = QVBoxLayout()
+
+        # Create the first dropdown list
+        category_combo = QComboBox()
+        category_combo.addItem("Type of algorithm")
+        category_combo.addItem("1")
+        category_combo.addItem("2")
+        category_combo.addItem("3")
+
+        layout.addWidget(category_combo)
+
+        algorithm_combo = QComboBox()
+        layout.addWidget(algorithm_combo)
+
+        run_button = QPushButton("Run")
+        layout.addWidget(run_button)
+
+        def update_algorithms():
+            category = category_combo.currentText()
+            algorithm_combo.clear()
+            algorithm_combo.addItems(algorithms[category])
+
+        category_combo.currentIndexChanged.connect(update_algorithms)
+
+        def run():
+            '''
+            ######
+            '''
+            dialog.accept()
+
+        run_button.clicked.connect(run)
+        # Create the second dropdown list
+        dialog.setLayout(layout)
+        dialog.exec_()
+
     # Saves .nodes to file named by user
     def save_to_file(self):
 
@@ -419,12 +638,13 @@ class MainWindow(QMainWindow):
             filename = filename_input.text()
             for sign in '#%&*{/\\}?:@:"\'!`|=+<>':
                 if sign in filename:
-                    QMessageBox.warning(dialog, "Warning", "Wrong filename, use only letters, numbers, signs like '_-,.'")
+                    QMessageBox.warning(dialog, "Warning",
+                                        "Wrong filename, use only letters, numbers, signs like '_-,.'")
                     return
             graph_save([v.node for v in self.vertices.values()], filename)
             dialog.close()
             return
-                
+
         dialog = QDialog(self)
         dialog.setWindowTitle("Saving to file")
         dialog.setGeometry(300, 300, 300, 100)
@@ -451,11 +671,12 @@ class MainWindow(QMainWindow):
             filename = filename_input.text()
             for sign in '#%&*{/\\}?:@:"\'!`|=+<>':
                 if sign in filename:
-                    QMessageBox.warning(dialog, "Warning", "Wrong filename, use only letters, numbers, signs like '_-,.'")
+                    QMessageBox.warning(dialog, "Warning",
+                                        "Wrong filename, use only letters, numbers, signs like '_-,.'")
                     return
-            try: 
-                nodes : list[Node] = graph_read(filename)
-                vertices : list[Vertex] = [x for x in self.vertices.values()]
+            try:
+                nodes: list[Node] = graph_read(filename)
+                vertices: list[Vertex] = [x for x in self.vertices.values()]
                 for x in vertices:
                     x.remove()
                 self.vertices.clear()
@@ -475,7 +696,7 @@ class MainWindow(QMainWindow):
                 return
             dialog.close()
             return
-                
+
         dialog = QDialog(self)
         dialog.setWindowTitle("Loading from file")
         dialog.setGeometry(300, 300, 300, 100)
@@ -494,7 +715,6 @@ class MainWindow(QMainWindow):
 
         dialog.setLayout(layout)
         dialog.exec_()
-
 
     def buttons_handler(self):
         button_type = self.sender().text()
