@@ -2,7 +2,7 @@ import sys
 import math
 from PyQt5.QtWidgets import QApplication, QMainWindow, QGraphicsScene, QGraphicsView, QGraphicsTextItem, \
     QGraphicsEllipseItem, QGraphicsLineItem, QPushButton, QGridLayout, QDialog, QLabel, QLineEdit, QVBoxLayout, \
-    QMessageBox, QRadioButton, QHBoxLayout, QGroupBox, QComboBox
+    QMessageBox, QRadioButton, QHBoxLayout, QGroupBox, QComboBox, QGraphicsPolygonItem
 from PyQt5.QtGui import QPen, QBrush, QColor, QPainter, QPainterPath, QPolygonF
 from PyQt5.QtCore import Qt, QPointF, QLineF, pyqtSignal, pyqtSlot
 from typing import List, Dict
@@ -130,15 +130,45 @@ class Vertex(QGraphicsEllipseItem):
         self.setPen(pen)
 
 
+class Arrowhead(QGraphicsPolygonItem):
+        def __init__(self, connection):
+            super().__init__(None)
+            self.connection : Connection = connection
+
+            self.setPen(self.connection.pen())
+            brush = QBrush(Qt.black)
+            self.setBrush(brush)
+            self.update_triangle()
+        
+        def update_triangle(self):
+            vector = [self.connection.origin_x - self.connection.end_x, self.connection.origin_y - self.connection.end_y]
+            length = (vector[0]**2 + vector[1]**2)**0.5
+            vector[0], vector[1] = vector[0]/length, vector[1]/length
+            pvector = [-vector[0], vector[1]]
+
+            new_traingle = QPolygonF()
+            node_r = 17
+            h = 10 + node_r
+            new_traingle.append(QPointF(self.connection.end_x + node_r*vector[0], self.connection.end_y + node_r*vector[1]))
+            new_traingle.append(QPointF(self.connection.end_x + h*vector[0] + 10*pvector[0], self.connection.end_y + h*vector[1] + 10*pvector[1]))
+            new_traingle.append(QPointF(self.connection.end_x + h*vector[0] - 10*pvector[0], self.connection.end_y + h*vector[1] - 10*pvector[1]))
+            self.setPolygon(new_traingle)
+
+
 class Connection(QGraphicsLineItem):
     def __init__(self, origin, end, directed, edge):
-        super().__init__(origin.initial_x + 17 + origin.x(), origin.initial_y + 17 + origin.y(),
-                         end.initial_x + 17 + end.x(), end.initial_y + 17 + end.y())
+        self.origin_x = origin.initial_x + 17 + origin.x()
+        self.origin_y = origin.initial_y + 17 + origin.y()
+        self.end_x = end.initial_x + 17 + end.x()
+        self.end_y = end.initial_y + 17 + end.y()
+        super().__init__(self.origin_x, self.origin_y,
+                         self.end_x, self.end_y)
         self.origin: Vertex = origin
         self.end: Vertex = end
         self.directed = directed
-        self.arrowhead = None
+        self.arrowhead: Arrowhead = None
         self.edge: Edge = edge
+        
         pen = QPen(Qt.black)
         pen.setWidth(2)
         self.setPen(pen)
@@ -157,6 +187,9 @@ class Connection(QGraphicsLineItem):
             text_y = self.line().center().y() - offset * math.cos(angle)
             self.weight_text.setPos(text_x - self.weight_text.boundingRect().width() / 2,
                                     text_y - self.weight_text.boundingRect().height() / 2)
+        if checks.get("Directed", False):
+            self.arrowhead = Arrowhead(self)
+            
 
     def __eq__(self, other):
         if not isinstance(other, Connection):
@@ -169,9 +202,16 @@ class Connection(QGraphicsLineItem):
     def __str__(self):
         return f"Conn {str(self.edge)}"
 
+    def add_arrowhead_to_scene(self):
+        self.scene().addItem(self.arrowhead)
+
     def adjust(self):
-        start_pos = QPointF(self.origin.initial_x + self.origin.x() + 17, self.origin.initial_y + self.origin.y() + 17)
-        end_pos = QPointF(self.end.initial_x + self.end.x() + 17, self.end.initial_y + self.end.y() + 17)
+        self.origin_x = self.origin.initial_x + 17 + self.origin.x()
+        self.origin_y = self.origin.initial_y + 17 + self.origin.y()
+        self.end_x = self.end.initial_x + 17 + self.end.x()
+        self.end_y = self.end.initial_y + 17 + self.end.y()
+        start_pos = QPointF(self.origin_x, self.origin_y)
+        end_pos = QPointF(self.end_x, self.end_y)
         line = QLineF(start_pos, end_pos)
         self.setLine(line)
 
@@ -183,6 +223,9 @@ class Connection(QGraphicsLineItem):
             text_y = self.line().center().y() - offset * math.cos(angle)
             self.weight_text.setPos(text_x - self.weight_text.boundingRect().width() / 2,
                                     text_y - self.weight_text.boundingRect().height() / 2)
+
+        if checks.get("Directed", False):
+            self.arrowhead.update_triangle()
 
     def mousePressEvent(self, event):
         super().mousePressEvent(event)
@@ -269,10 +312,16 @@ class MainWindow(QMainWindow):
             for edge in node.edges.values():
                 edges.add(edge)
         for edge in edges:
-            self.scene.addItem(self.create_edge(edge))
+            line = self.create_edge(edge)
+            self.scene.addItem(line)
+            if checks.get("Directed", False):
+                line.add_arrowhead_to_scene()
 
         # Initialize UI #
+        ###################
 
+
+        ####################
         # Create grid and buttons
         self.grid = QGridLayout(self.view)
 
@@ -485,9 +534,11 @@ class MainWindow(QMainWindow):
                 origin.node.connect(end.node, False)
 
             # create the edge
-            edge = origin.node.get_edge(end.node)
-
-            self.scene.addItem(self.create_edge(edge))
+            edge= origin.node.get_edge(end.node)
+            connection: Connection = self.create_edge(edge)
+            self.scene.addItem(connection)
+            if checks.get("Directed", False):
+                connection.add_arrowhead_to_scene()
             # # Set the pen for the edge
             # pen = QPen(Qt.black)
             # pen.setWidth(2)
@@ -576,7 +627,7 @@ class MainWindow(QMainWindow):
             for check in node_options_checklist:
                 if check.isChecked():
                     checks[check.text()] = True
-
+            print(checks)
             dialog.accept()
 
         create_button.clicked.connect(create_graph)
