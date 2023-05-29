@@ -9,6 +9,7 @@ class Algorytm:
         self.nodes : dict[int : Node]= {i : self.verticies[i].node for i in verticies}
         self.selectedID : int = None
 
+    # Vericies
     def change_visited(self, args, state):
         node : Node = args[0]
         node.change_visited(state)
@@ -26,7 +27,11 @@ class Algorytm:
             self.verticies[next].set_selected()
         self.selectedID = next
     
-
+    # Edges
+    def change_flow(self, args, next_flow : int):
+        edge : Edge = args[0]
+        edge.change_flow_to(next_flow)
+        edge.connection.uptade_cost()
     #-------------------------------
 
     def write_change_visited(self, node : Node, state ):

@@ -107,6 +107,7 @@ class Edge:
         self.flow = flow
         self.minflow = minflow
         self.cost = cost
+        self.connection = None
 
     def __hash__(self) -> int:
         return 3*hash(self.origin) + hash(self.end)

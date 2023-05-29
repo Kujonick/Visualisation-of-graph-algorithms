@@ -144,19 +144,21 @@ class Arrowhead(QGraphicsPolygonItem):
             vector = [self.connection.origin_x - self.connection.end_x, self.connection.origin_y - self.connection.end_y]
             length = (vector[0]**2 + vector[1]**2)**0.5
             vector[0], vector[1] = vector[0]/length, vector[1]/length
-            pvector = [-vector[0], vector[1]]
+            pvector = [-vector[1], vector[0]]
 
             new_traingle = QPolygonF()
             node_r = 17
-            h = 10 + node_r
+            h = 10 + node_r # height of arrow
+            w = 5           # width of arrow
             new_traingle.append(QPointF(self.connection.end_x + node_r*vector[0], self.connection.end_y + node_r*vector[1]))
-            new_traingle.append(QPointF(self.connection.end_x + h*vector[0] + 10*pvector[0], self.connection.end_y + h*vector[1] + 10*pvector[1]))
-            new_traingle.append(QPointF(self.connection.end_x + h*vector[0] - 10*pvector[0], self.connection.end_y + h*vector[1] - 10*pvector[1]))
+            new_traingle.append(QPointF(self.connection.end_x + h*vector[0] + w*pvector[0], self.connection.end_y + h*vector[1] + w*pvector[1]))
+            new_traingle.append(QPointF(self.connection.end_x + h*vector[0] - w*pvector[0], self.connection.end_y + h*vector[1] - w*pvector[1]))
             self.setPolygon(new_traingle)
 
 
 class Connection(QGraphicsLineItem):
     def __init__(self, origin, end, directed, edge):
+        
         self.origin_x = origin.initial_x + 17 + origin.x()
         self.origin_y = origin.initial_y + 17 + origin.y()
         self.end_x = end.initial_x + 17 + end.x()
@@ -168,17 +170,19 @@ class Connection(QGraphicsLineItem):
         self.directed = directed
         self.arrowhead: Arrowhead = None
         self.edge: Edge = edge
+        self.edge.connection = self
         
         pen = QPen(Qt.black)
         pen.setWidth(2)
         self.setPen(pen)
 
-        if checks.get("Weighted", False):
+        if not checks.get("Unweighted", False):
             self.weight_text = QGraphicsTextItem(self)
-            if self.edge is not None and self.edge.cost is not None:
-                self.weight_text.setPlainText(str(self.edge.cost))
+            if checks.get("Weighted", False):
+                self.update_weight()
             else:
-                self.weight_text.setPlainText("1")
+                self.uptade_maxflow()
+
             self.weight_text.setDefaultTextColor(Qt.black)
             # Calculate the position of the weight text
             angle = math.atan2(self.line().dy(), self.line().dx())
@@ -187,7 +191,7 @@ class Connection(QGraphicsLineItem):
             text_y = self.line().center().y() - offset * math.cos(angle)
             self.weight_text.setPos(text_x - self.weight_text.boundingRect().width() / 2,
                                     text_y - self.weight_text.boundingRect().height() / 2)
-        if checks.get("Directed", False):
+        if directed:
             self.arrowhead = Arrowhead(self)
             
 
@@ -215,7 +219,7 @@ class Connection(QGraphicsLineItem):
         line = QLineF(start_pos, end_pos)
         self.setLine(line)
 
-        if checks.get("Weighted", False):
+        if not checks.get("Unweighted", False):
             # Calculate the position of the weight text
             angle = math.atan2(line.dy(), line.dx())
             offset = 15
@@ -224,7 +228,7 @@ class Connection(QGraphicsLineItem):
             self.weight_text.setPos(text_x - self.weight_text.boundingRect().width() / 2,
                                     text_y - self.weight_text.boundingRect().height() / 2)
 
-        if checks.get("Directed", False):
+        if self.directed:
             self.arrowhead.update_triangle()
 
     def mousePressEvent(self, event):
@@ -233,12 +237,64 @@ class Connection(QGraphicsLineItem):
             # self.origin.connections.remove(self)
             # self.end.connections.remove(self)
             self.remove()
+            return
+        if event.button() == Qt.LeftButton and True not in modes.values() and not checks.get("Unweighted", False):
+            def change_button():
+                given_value = new_value.text()
+                if len(given_value) == 0:
+                    QMessageBox.warning(dialog, "Warning",
+                                            "Number must be at least one digit ")
+                    return 
+                if given_value[0] == '0':
+                    QMessageBox.warning(dialog, "Warning",
+                                            "Number can't start with 0 (especialy be '0')")
+                    return 
+                for sign in given_value:
+                    if sign not in '0123456789':
+                        QMessageBox.warning(dialog, "Warning",
+                                            "Only numbers [1-9][0-9]*, no floats")
+                        return
+                    
+                if checks.get("Weighted", False):
+                    self.edge.set_cost(int(given_value))
+                    self.update_weight()
+                else:
+                    self.edge.set_maxflow(int(given_value))
+                    self.uptade_maxflow()
+                dialog.close()
+                return
+
+            dialog = QDialog(self.window())
+            dialog.setWindowTitle("Change edge")
+            dialog.setGeometry(300, 300, 300, 100)
+            dialog.setModal(True)
+            if checks.get("Weighted", False):
+                number_label = QLabel("New Edge weight:")
+            else:
+                number_label = QLabel("New Edge max flow:")
+
+            new_value = QLineEdit()
+            confirm_button = QPushButton("Set")
+
+            layout = QVBoxLayout()
+            layout.addWidget(number_label)
+            layout.addWidget(new_value)
+
+            layout.addWidget(confirm_button)
+            confirm_button.clicked.connect(change_button)
+
+            dialog.setLayout(layout)
+            dialog.exec_()
+            #########################
 
     def remove(self):
         self.origin.connections.remove(self)
         self.end.connections.remove(self)
         self.edge.remove()
+        if self.directed:
+            self.scene().removeItem(self.arrowhead)
         self.scene().removeItem(self)
+        
         del self
 
     def set_selected(self):
@@ -248,6 +304,18 @@ class Connection(QGraphicsLineItem):
     def set_unselected(self):
         pen = QPen(Qt.black)
         self.setPen(pen)
+
+    def update_weight(self):
+        if self.edge.cost is not None:
+            self.weight_text.setPlainText(str(self.edge.cost))
+        else:
+            self.weight_text.setPlainText("-")
+
+    def uptade_maxflow(self):
+        if self.edge.maxflow is not None:
+            self.weight_text.setPlainText(f"/ {str(self.edge.maxflow)}")
+        else:
+            self.weight_text.setPlainText("/-")
 
 
 class GraphicsScene(QGraphicsScene):
@@ -311,17 +379,21 @@ class MainWindow(QMainWindow):
         for node in nodes:
             for edge in node.edges.values():
                 edges.add(edge)
+        if checks.get("Directed", False):
+            for edge in edges:
+                edge.directed = True
         for edge in edges:
-            line = self.create_edge(edge)
-            self.scene.addItem(line)
+            connection: Connection = self.create_edge(edge)
+            self.scene.addItem(connection)
             if checks.get("Directed", False):
-                line.add_arrowhead_to_scene()
+                connection.add_arrowhead_to_scene()
+            # line = self.create_edge(edge)
+            # self.scene.addItem(line)
+            # if checks.get("Directed", False):
+            #     line.add_arrowhead_to_scene()
 
         # Initialize UI #
-        ###################
 
-
-        ####################
         # Create grid and buttons
         self.grid = QGridLayout(self.view)
 
@@ -470,8 +542,7 @@ class MainWindow(QMainWindow):
         origin_input = QLineEdit()
         end_label = QLabel("End:")
         end_input = QLineEdit()
-        weight_label = QLabel("Weight:")
-        weight_input = QLineEdit()
+        
 
         # create button to connect vertices
         connect_button = QPushButton("Connect")
@@ -482,9 +553,14 @@ class MainWindow(QMainWindow):
         layout.addWidget(origin_input)
         layout.addWidget(end_label)
         layout.addWidget(end_input)
-        if checks.get("Weighted", False):
-            layout.addWidget(weight_label)
-            layout.addWidget(weight_input)
+        if not checks.get("Unweighted", False):
+            if checks.get("Weighted", False):
+                value_label = QLabel("Weight:")
+            else:
+                value_label = QLabel("Maxflow:")
+            value_input = QLineEdit()
+            layout.addWidget(value_label)
+            layout.addWidget(value_input)
 
         layout.addWidget(connect_button)
         dialog.setLayout(layout)
@@ -493,7 +569,9 @@ class MainWindow(QMainWindow):
             # get the origin and end vertices from the input fields
             origin_id = origin_input.text()
             end_id = end_input.text()
-            weight = weight_input.text()
+
+            if not checks.get("Unweighted", False):
+                value = value_input.text()
 
             # check if the input fields are not empty
             if not origin_id or not end_id:
@@ -523,15 +601,35 @@ class MainWindow(QMainWindow):
                     Program does not support multigraphs.")
                     return
 
-            if checks.get("Weighted", False) and not weight:
-                QMessageBox.warning(dialog, "Warning", "Please enter the weight of the edge.")
-                return
+            if not checks.get("Unweighted", False):
+                if not value:
+                    QMessageBox.warning(dialog, "Warning", "Please enter the weight of the edge.")
 
-            # connecting nodes
+                if len(value) == 0:
+                    QMessageBox.warning(dialog, "Warning",
+                                            "Number must be at least one digit ")
+                    return 
+                if value[0] == '0':
+                    QMessageBox.warning(dialog, "Warning",
+                                            "Number can't start with 0 (especialy be '0')")
+                    return 
+                for sign in value:
+                    if sign not in '0123456789':
+                        QMessageBox.warning(dialog, "Warning",
+                                            "Only numbers [1-9][0-9]*, no floats")
+                        return
+                
+
+            # connecting node
+
+            directed = checks.get("Directed", False)
+
             if checks.get("Weighted", False):
-                origin.node.connect(end.node, False, None, None, int(weight))
+                origin.node.connect(end.node, directed, cost = int(value))
+            elif checks.get("Flow", False):
+                origin.node.connect(end.node, directed, maxflow = int(value))
             else:
-                origin.node.connect(end.node, False)
+                origin.node.connect(end.node, directed)
 
             # create the edge
             edge= origin.node.get_edge(end.node)
