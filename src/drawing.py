@@ -11,6 +11,9 @@ from graphs import Node, Edge
 from savers import graph_save, graph_read
 from errors import FileReadError
 
+from algorythms import algorythmSteps
+import algorythms.BFS as BFS
+
 modes = {
     "Add Vertex": False,
     "Delete Vertex/Edge": False
@@ -18,10 +21,14 @@ modes = {
 
 checks = {}
 
-algorithms = {
-    "1": ["algo1", "algo2", "algo3"],
+algorythms_names = {
+    "Primitive": ["BFS", "algo2", "algo3"],
     "2": ["algo4", "algo5", "algo6"],
     "3": ["algo7", "algo8", "algo9"]
+}
+
+algorythms = {
+    "BFS" : BFS
 }
 
 Vertex_Colors = {
@@ -143,6 +150,8 @@ class Arrowhead(QGraphicsPolygonItem):
         def update_triangle(self):
             vector = [self.connection.origin_x - self.connection.end_x, self.connection.origin_y - self.connection.end_y]
             length = (vector[0]**2 + vector[1]**2)**0.5
+            if length == 0:
+                return
             vector[0], vector[1] = vector[0]/length, vector[1]/length
             pvector = [-vector[1], vector[0]]
 
@@ -234,9 +243,8 @@ class Connection(QGraphicsLineItem):
     def mousePressEvent(self, event):
         super().mousePressEvent(event)
         if event.button() == Qt.LeftButton and modes["Delete Vertex/Edge"]:
-            # self.origin.connections.remove(self)
-            # self.end.connections.remove(self)
             self.remove()
+
             return
         if event.button() == Qt.LeftButton and True not in modes.values() and not checks.get("Unweighted", False):
             def change_button():
@@ -438,6 +446,15 @@ class MainWindow(QMainWindow):
         self.grid.setSpacing(0)
         self.grid.setContentsMargins(0, 0, 0, 0)
 
+    # sets modification buttons on and off
+    def set_buttons(self, set_to : bool): 
+        self.delete_mode_button.setEnabled(set_to)
+        self.add_edge_mode_button.setEnabled(set_to)
+        self.add_vertex_mode_button.setEnabled(set_to)
+        self.save_graph_button.setEnabled(set_to)
+        self.load_graph_button.setEnabled(set_to)
+
+
     def create_vertex(self, node: Node):
         # Create a QGraphicsTextItem to hold the node index
         text = QGraphicsTextItem(str(node.id))
@@ -513,11 +530,6 @@ class MainWindow(QMainWindow):
         # text_rect = text.boundingRect()
         # Set the pen for the edge
         # moved to __init__
-
-        # if edge is directed - add arrowhead
-        '''
-        if edge.directed:
-            self.create_arrowhead(line)'''
 
         # Add the edge to the origin/end vertex's edges list
         origin_vertex.add_connection(line)
@@ -750,7 +762,7 @@ class MainWindow(QMainWindow):
         # Create the first dropdown list
         category_combo = QComboBox()
         category_combo.addItem("Type of algorithm")
-        category_combo.addItem("1")
+        category_combo.addItem("Primitive")
         category_combo.addItem("2")
         category_combo.addItem("3")
 
@@ -765,14 +777,12 @@ class MainWindow(QMainWindow):
         def update_algorithms():
             category = category_combo.currentText()
             algorithm_combo.clear()
-            algorithm_combo.addItems(algorithms[category])
+            algorithm_combo.addItems(algorythms_names[category])
 
         category_combo.currentIndexChanged.connect(update_algorithms)
 
         def run():
-            '''
-            ######
-            '''
+            self.set_buttons(False)
             dialog.accept()
 
         run_button.clicked.connect(run)
@@ -831,11 +841,14 @@ class MainWindow(QMainWindow):
                 self.vertices.clear()
                 for node in nodes:
                     self.scene.addItem(self.create_vertex(node))
+                    node.show()
                 for node in nodes:
                     for edge in node.edges.values():
-                        if edge.directed and node != edge.origin:
+                        if node != edge.origin:
                             continue
-                        self.scene.addItem(self.create_edge(edge))
+                        line = self.create_edge(edge)
+                        self.scene.addItem(line)
+                        line.add_arrowhead_to_scene()
 
             except FileReadError as e:
                 QMessageBox.warning(dialog, f"Error {e.__class__.__name__}", str(e))

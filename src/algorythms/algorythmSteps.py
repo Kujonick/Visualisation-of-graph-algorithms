@@ -1,3 +1,10 @@
+
+import sys, os
+module_path = os.path.abspath("src")
+
+if module_path not in sys.path:
+    sys.path.append(module_path)
+
 from typing import List, Any, Tuple
 from graphs import Node, Edge
 
@@ -39,6 +46,19 @@ class AlgorythmSteps:
             yield self.steps[self.index]
             self.index -= 1
         return 
+    
+    def show_current_step(self):
+        output = "START ->"
+        if self.index > -1:
+            x = self.steps[self.index-1]
+            output = f"({x[0].__name__},{x[1]},{x[2]}) ->"
+            if self.index > 0:
+                x = self.steps[self.index]
+                output = f"({x[0].__name__},{x[1]},{x[2]})" + output
+        if self.index < len(self.steps) -1:
+            x = self.steps[self.index+1]
+            output = output + f" -> ({x[0].__name__},{x[1]},{x[2]})"
+        print(output)
 
 if __name__ == "__main__":
     Steps = AlgorythmSteps()
@@ -48,9 +68,10 @@ if __name__ == "__main__":
     def test_b():
         return 
     
-    Steps.add_step(test_a, 0, 1)
-    assert(Steps.next_step() == (test_a, 1))
-    Steps.add_step(test_b, 2, 3)
-    assert(Steps.next_step()== (test_b, 3))
-    assert(Steps.previous_step() == (test_b, 2))
-    assert(Steps.previous_step() == (test_a, 0))
+    Steps.add_step(test_a, (), (0, 1))
+    Steps.show_current_step()
+    assert(Steps.next_step() == (test_a,(), (0, 1)))
+    Steps.add_step(test_b, (1), (2, 3))
+    assert(Steps.next_step()== (test_b,(1), (2, 3)))
+    assert(Steps.previous_step() == (test_b,(1), (2, 3)))
+    assert(Steps.previous_step() == (test_a,(), (0, 1)))
