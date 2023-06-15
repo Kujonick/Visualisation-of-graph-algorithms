@@ -1,1 +1,1 @@
-# Visualisation-of-graph-algorithms
+# Visualisation-of-graph-algorithms (VGA)

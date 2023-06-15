@@ -36,6 +36,37 @@ Vertex_Colors = {
     "unvisited": (169, 192, 255),
 }
 
+def get_vertex_value():
+    dialog = QDialog()
+    dialog.setWindowTitle("Set vertex value")
+    dialog.setGeometry(300, 300, 300, 100)
+    dialog.setModal(True)
+
+    value_label = QLabel("Value:")
+    value_input = QLineEdit()
+
+    create_button = QPushButton("Create Vertex")
+
+    # layout for the dialog window
+    layout = QVBoxLayout()
+    layout.addWidget(value_label)
+    layout.addWidget(value_input)
+    layout.addWidget(create_button)
+    dialog.setLayout(layout)
+
+    def get_text_value():
+        value = value_input.text()
+
+        if not value:
+            QMessageBox.warning(dialog, "Warning", "Please enter value for vertex.")
+            return
+        
+        dialog.accept()
+
+    create_button.clicked.connect(get_text_value)
+    dialog.exec_()
+    return value_input.text()
+
 
 class Vertex(QGraphicsEllipseItem):
     def __init__(self, node: Node):
@@ -61,12 +92,12 @@ class Vertex(QGraphicsEllipseItem):
         self.connections = []
 
         # Text value
-        if checks.get("With Value", False):
-            self.value: QGraphicsTextItem = QGraphicsTextItem('-')
-            self.value.setDefaultTextColor(QColor(255, 0, 0))
-            self.value.setParentItem(self)
-            text_rect = self.value.boundingRect()
-            self.value.setPos(node.x - text_rect.width() / 2 + 15, node.y - 4 * text_rect.height() / 5 + 17)
+        # if checks.get("With Value", False):
+        self.value: QGraphicsTextItem = QGraphicsTextItem('-')
+        self.value.setDefaultTextColor(QColor(255, 0, 0))
+        self.value.setParentItem(self)
+        text_rect = self.value.boundingRect()
+        self.value.setPos(node.x - text_rect.width() / 2 + 15, node.y - 4 * text_rect.height() / 5 + 17)
 
         # Set signal in case of removal
 
@@ -95,11 +126,30 @@ class Vertex(QGraphicsEllipseItem):
             edge.adjust()
 
         self.node.update_position(self.initial_x + self.x(), self.initial_y + self.y())
+    def find_window(self):
+        parent = self.parentItem()
+        print(parent)
+        while parent:
+            
+            if isinstance(parent, QGraphicsView):
+                return parent
+            parent = parent.parentItem()
+        return None
 
     def mousePressEvent(self, event):
         super().mousePressEvent(event)
         if event.button() == Qt.LeftButton and modes["Delete Vertex/Edge"]:
             self.remove()
+            return
+
+        if event.button() == Qt.RightButton and checks.get("With Value", False):
+            
+            value = get_vertex_value()
+            self.node.value = value
+            self.changed_value()
+
+
+            
 
     def remove(self):
         for edge in self.connections[::-1]:
@@ -339,6 +389,7 @@ class GraphicsScene(QGraphicsScene):
             self.vertex_add_sig.emit((event.scenePos().x() - 17, event.scenePos().y() - 17))
 
 
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -467,10 +518,10 @@ class MainWindow(QMainWindow):
         # Add the text to the vertex
         text.setParentItem(vertex)
         text_rect = text.boundingRect()
-        if checks.get("With Value", False):
-            text.setPos(node.x - text_rect.width() / 2 + 17, node.y - text_rect.height() / 4 + 17)
-        else:
-            text.setPos(node.x - text_rect.width() / 2 + 17, node.y - text_rect.height() / 2 + 17)
+        # if checks.get("With Value", False):
+        text.setPos(node.x - text_rect.width() / 2 + 17, node.y - text_rect.height() / 4 + 17)
+        # else:
+        #     text.setPos(node.x - text_rect.width() / 2 + 17, node.y - text_rect.height() / 2 + 17)
 
         vertex.setZValue(1)
 
@@ -487,36 +538,8 @@ class MainWindow(QMainWindow):
         available_id = max(list(self.vertices.keys())) + 1 if len(self.vertices) > 0 else 0
         node = Node(available_id, position[0], position[1])
         if checks.get("With Value", False):
-            dialog = QDialog(self)
-            dialog.setWindowTitle("Set vertex value")
-            dialog.setGeometry(300, 300, 300, 100)
-            dialog.setModal(True)
-
-            value_label = QLabel("Value:")
-            value_input = QLineEdit()
-
-            create_button = QPushButton("Create Vertex")
-
-            # layout for the dialog window
-            layout = QVBoxLayout()
-            layout.addWidget(value_label)
-            layout.addWidget(value_input)
-            layout.addWidget(create_button)
-            dialog.setLayout(layout)
-
-            def set_vertex_value():
-                value = value_input.text()
-
-                if not value:
-                    QMessageBox.warning(dialog, "Warning", "Please enter value for vertex.")
-                    return
-
-                node.change_value(value)
-                dialog.accept()
-
-            create_button.clicked.connect(set_vertex_value)
-            dialog.exec_()
-
+            value = self.get_vertex_value()
+            node.change_value(value)
         vertex = self.create_vertex(node)
         self.vertices[node.id] = vertex
         self.scene.addItem(vertex)
