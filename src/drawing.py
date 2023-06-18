@@ -16,7 +16,8 @@ import algorythms.BFS as BFS
 
 modes = {
     "Add Vertex": False,
-    "Delete Vertex/Edge": False
+    "Delete Vertex/Edge": False,
+    "Run" : False
 }
 
 checks = {}
@@ -142,7 +143,7 @@ class Vertex(QGraphicsEllipseItem):
             self.remove()
             return
 
-        if event.button() == Qt.RightButton and checks.get("With Value", False):
+        if event.button() == Qt.RightButton and checks.get("With Value", False) and not modes["Run"]:
             
             value = get_vertex_value()
             self.node.value = value
@@ -391,6 +392,7 @@ class GraphicsScene(QGraphicsScene):
 
 
 class MainWindow(QMainWindow):
+
     def __init__(self):
         super().__init__()
 
@@ -413,7 +415,7 @@ class MainWindow(QMainWindow):
         self.view.setRenderHints(QPainter.Antialiasing)
         self.installEventFilter(self.view)
         # Set the window properties
-        self.setWindowTitle("Node Viewer")
+        self.setWindowTitle("Visualization of graph algorythms")
         self.setGeometry(100, 100, 800, 600)
 
         # Add the view to the window
@@ -456,6 +458,7 @@ class MainWindow(QMainWindow):
         # Create grid and buttons
         self.grid = QGridLayout(self.view)
 
+        # Modifycation buttons
         self.delete_mode_button = QPushButton("Delete Vertex/Edge", self)
         self.delete_mode_button.clicked.connect(self.buttons_handler)
         self.add_vertex_mode_button = QPushButton("Add Vertex", self)
@@ -463,48 +466,87 @@ class MainWindow(QMainWindow):
         self.add_edge_mode_button = QPushButton("Add Edge", self)
         self.add_edge_mode_button.clicked.connect(self.add_edge)
 
+        # # Algorythm button
         self.algorithm_button = QPushButton("Algorithms...", self)
         self.algorithm_button.clicked.connect(self.run_algorithm)
 
+        # File buttons 
         self.save_graph_button = QPushButton("Save to file", self)
         self.save_graph_button.clicked.connect(self.save_to_file)
         self.load_graph_button = QPushButton("Load to file", self)
         self.load_graph_button.clicked.connect(self.load_from_file)
 
+        # Running algorythm buttons
+        self.next_step_button = QPushButton("Next", self)
+        self.next_step_button.setEnabled(False)
+        # self.algorithm_button.clicked.connect(self.run_algorithm)
+        
+        self.prev_step_button = QPushButton("Previous", self)
+        self.prev_step_button.setEnabled(False)
+
+        # return button
+        self.back_button = QPushButton("Back", self)
+        self.back_button.clicked.connect(self.back_button_action)
+
+        # Editing Modes
         self.previous_mode = None
 
+
+        # Labels
         add_edge_mode_label = QLabel(self)
         delete_mode_label = QLabel(self)
+        run_mode_label = QLabel(self)
         add_edge_mode_label.setText("ADD VERTEX MODE ENABLED")
         add_edge_mode_label.setVisible(False)
         delete_mode_label.setText("DELETE MODE ENABLED")
         delete_mode_label.setVisible(False)
+        run_mode_label.setText("RUNNING")
+        run_mode_label.setVisible(False)
         self.mode_labels = {
             "Add Vertex": add_edge_mode_label,
-            "Delete Vertex/Edge": delete_mode_label
+            "Delete Vertex/Edge": delete_mode_label,
+            "Run": run_mode_label 
         }
 
-        self.grid.addWidget(add_edge_mode_label, 0, 0, 1, 2, Qt.AlignLeft | Qt.AlignTop)
-        self.grid.addWidget(delete_mode_label, 0, 0, 1, 2, Qt.AlignLeft | Qt.AlignTop)
+        # Adding all labels to viev
+        self.grid.addWidget(add_edge_mode_label, 0, 3, Qt.AlignTop | Qt.AlignCenter)
+        self.grid.addWidget(delete_mode_label, 0, 3, Qt.AlignTop | Qt.AlignCenter)
+        self.grid.addWidget(run_mode_label, 0, 3, Qt.AlignTop | Qt.AlignCenter)
+
+        # And buttons
         self.grid.addWidget(self.add_vertex_mode_button, 1, 0, Qt.AlignLeft | Qt.AlignBottom)
         self.grid.addWidget(self.add_edge_mode_button, 1, 1, Qt.AlignLeft | Qt.AlignBottom)
         self.grid.addWidget(self.delete_mode_button, 1, 2, Qt.AlignLeft | Qt.AlignBottom)
         self.grid.addWidget(self.algorithm_button, 1, 3, Qt.AlignBottom)
         self.grid.addWidget(self.save_graph_button, 1, 8, Qt.AlignRight | Qt.AlignBottom)
         self.grid.addWidget(self.load_graph_button, 1, 9, Qt.AlignRight | Qt.AlignBottom)
+        
+        self.grid.addWidget(self.next_step_button, 0, 9, 1, 1, Qt.AlignTop | Qt.AlignRight)
+        self.grid.addWidget(self.prev_step_button, 0, 8, 1, 1, Qt.AlignTop | Qt.AlignRight)
+        self.grid.addWidget(self.back_button, 0, 0, 1, 2, Qt.AlignTop | Qt.AlignLeft)
 
         self.grid.setColumnStretch(3, 1)
         self.grid.setSpacing(0)
         self.grid.setContentsMargins(0, 0, 0, 0)
 
     # sets modification buttons on and off
-    def set_buttons(self, set_to : bool): 
-        self.delete_mode_button.setEnabled(set_to)
-        self.add_edge_mode_button.setEnabled(set_to)
-        self.add_vertex_mode_button.setEnabled(set_to)
-        self.save_graph_button.setEnabled(set_to)
-        self.load_graph_button.setEnabled(set_to)
+    def set_edit_buttons(self, edit_mode : bool): 
+        '''
+        sets Editing, loading and algorythm buttons 'Enabled' status to [edit_mode]
+        '''
+        self.delete_mode_button.setEnabled(edit_mode)
+        self.add_edge_mode_button.setEnabled(edit_mode)
+        self.add_vertex_mode_button.setEnabled(edit_mode)
+        self.save_graph_button.setEnabled(edit_mode)
+        self.load_graph_button.setEnabled(edit_mode)
+        self.algorithm_button.setEnabled(edit_mode)
 
+    def set_run_buttons(self, run_mode : bool):
+        '''
+        sets next and previous buttons 'Enabled' status to [run_mode]
+        '''
+        self.next_step_button.setEnabled(run_mode)
+        self.prev_step_button.setEnabled(run_mode)
 
     def create_vertex(self, node: Node):
         # Create a QGraphicsTextItem to hold the node index
@@ -774,6 +816,28 @@ class MainWindow(QMainWindow):
         dialog.setLayout(layout)
         dialog.exec_()
 
+    def back_button_action(self):
+        if modes["Run"]:
+            self.turn_edit_mode()
+        else:
+            self.view._exit()
+            self.__init__()
+
+
+    def turn_run_mode(self, dialog_window):####
+        self.set_edit_buttons(False)
+        modes["Run"] = True
+        self.mode_labels["Run"].setVisible(True)
+        self.set_run_buttons(True)
+        dialog_window.accept()
+
+    def turn_edit_mode(self):
+        self.set_run_buttons(False)
+        modes["Run"] = False
+        self.mode_labels["Run"].setVisible(False)
+        self.set_edit_buttons(True)
+        
+
     def run_algorithm(self):
         dialog = QDialog(self)
         dialog.setWindowTitle("Run Algorithm")
@@ -796,19 +860,18 @@ class MainWindow(QMainWindow):
 
         run_button = QPushButton("Run")
         layout.addWidget(run_button)
+        run_button.setEnabled(False)
 
         def update_algorithms():
             category = category_combo.currentText()
             algorithm_combo.clear()
+            run_button.setEnabled(True)
             algorithm_combo.addItems(algorythms_names[category])
 
         category_combo.currentIndexChanged.connect(update_algorithms)
 
-        def run():
-            self.set_buttons(False)
-            dialog.accept()
 
-        run_button.clicked.connect(run)
+        run_button.clicked.connect(lambda : self.turn_run_mode(dialog)) # lambda because it must be function
         # Create the second dropdown list
         dialog.setLayout(layout)
         dialog.exec_()
