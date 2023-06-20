@@ -13,7 +13,7 @@ from errors import FileReadError
 
 from algorythms.algorythmSteps import AlgorythmSteps
 from algorythms.Primitive import BFS, DFS  
-
+from algorythms.PathFinders import Dijkstra
 modes = {
     "Add Vertex": False,
     "Add Edge": False,
@@ -24,14 +24,14 @@ modes = {
 checks = {}
 
 algorythms_names = {
-    "Primitive": ["BFS", "DFS"],
-    "2": ["algo4", "algo5", "algo6"],
-    "3": ["algo7", "algo8", "algo9"]
+    "Primitive": ["BFS", "DFS"]
 }
+
 
 algorythms = {
     "BFS" : BFS,
-    "DFS" : DFS
+    "DFS" : DFS,
+    "Dijkstra" : Dijkstra
 }
 
 Vertex_Colors = {
@@ -72,6 +72,7 @@ def get_vertex_value():
 
 
 class Vertex(QGraphicsEllipseItem):
+    
     def __init__(self, node: Node):
         super().__init__(node.x, node.y, 34, 34)
         # Remember initial position of vertex for mouseReleaseEvent
@@ -138,15 +139,6 @@ class Vertex(QGraphicsEllipseItem):
             edge.adjust()
 
         self.node.update_position(self.initial_x + self.x(), self.initial_y + self.y())
-    def find_window(self):
-        parent = self.parentItem()
-        print(parent)
-        while parent:
-            
-            if isinstance(parent, QGraphicsView):
-                return parent
-            parent = parent.parentItem()
-        return None
 
     def mousePressEvent(self, event):
         super().mousePressEvent(event)
@@ -191,7 +183,7 @@ class Vertex(QGraphicsEllipseItem):
 
     def set_selected(self):
         pen = QPen(Qt.red)
-        pen.setWidth(5)
+        pen.setWidth(3)
         self.setPen(pen)
 
     def set_unselected(self):
@@ -415,6 +407,12 @@ class MainWindow(QMainWindow):
         if not checks:
             sys.exit()
 
+        if checks.get("Weighted", False):
+            algorythms_names["PathFinders"] = ["Dijkstra"]
+
+        # OTHER 
+
+
         # Initialize Graph #
 
         # main list of all nodes
@@ -432,8 +430,10 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Visualization of graph algorythms")
         self.setGeometry(100, 100, 800, 600)
 
-        self.view.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)  # Wyłączenie pionowego paska przewijania
+        # Turning off scrolls on the edges of window
+        self.view.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)  
         self.view.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+
         # Add the view to the window
         self.setCentralWidget(self.view)
 
@@ -974,9 +974,8 @@ class MainWindow(QMainWindow):
         # Create the first dropdown list
         category_combo = QComboBox()
         category_combo.addItem("Type of algorithm")
-        category_combo.addItem("Primitive")
-        category_combo.addItem("2")
-        category_combo.addItem("3")
+        for name in algorythms_names:
+            category_combo.addItem(name)
 
         layout.addWidget(category_combo)
 

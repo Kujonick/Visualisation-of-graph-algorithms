@@ -2,26 +2,9 @@ import sys, os
 module_path = os.path.abspath("src/algorythms")
 sys.path.append(module_path)
 
-from Algorythm import Algorytm
+from Algorythm import  PathSearch
 from collections import deque
-class PathSearch (Algorytm):
-    def __init__(self, verticies):
-        super().__init__(verticies)
-        self.parameters_name = ["s","t"]
-        self.parameters = {}
 
-    def get_parameters_name(self):
-        return self.parameters_name
-    
-    def set_parameters(self, parameter, value):
-        self.parameters[parameter] = value
-    
-    def constrains(self, parameter, value):
-        if parameter == 's':
-            return self.nodes.get(value, None) != None
-        if parameter == 't':
-            return self.nodes.get(value, None) != None and value != self.parameters['s']
-        return False
 
 class BFS (PathSearch):
     def __init__(self, verticies):
@@ -77,7 +60,7 @@ class DFS (PathSearch):
                 break
             for u in self.nodes[v].edges:
                 if not self.nodes[u].visited:
-                    Q.append(u)
+                    Q.append((u, v))
         else:
             return
         line = []

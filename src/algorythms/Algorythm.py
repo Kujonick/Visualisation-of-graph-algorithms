@@ -120,4 +120,21 @@ class Algorytm:
             f, args, states = x
             f(args, states[1])
             
-        
+class PathSearch (Algorytm):
+    def __init__(self, verticies):
+        super().__init__(verticies)
+        self.parameters_name = ["s","t"]
+        self.parameters = {}
+
+    def get_parameters_name(self):
+        return self.parameters_name
+    
+    def set_parameters(self, parameter, value):
+        self.parameters[parameter] = value
+    
+    def constrains(self, parameter, value):
+        if parameter == 's':
+            return self.nodes.get(value, None) != None
+        if parameter == 't':
+            return self.nodes.get(value, None) != None and value != self.parameters['s']
+        return False
