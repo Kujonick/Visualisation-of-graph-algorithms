@@ -11,8 +11,8 @@ from graphs import Node, Edge
 from savers import graph_save, graph_read
 from errors import FileReadError
 
-from algorythms import algorythmSteps
-import algorythms.BFS as BFS
+from algorythms.algorythmSteps import AlgorythmSteps
+from algorythms.BFS import BFS
 
 modes = {
     "Add Vertex": False,
@@ -102,6 +102,14 @@ class Vertex(QGraphicsEllipseItem):
 
         # Set signal in case of removal
 
+    def get_connection(self, other):
+        for conn in self.connections:
+            if self == conn.origin and other == conn.end:
+                return conn
+            elif self == conn.end and other == conn.origin:
+                return conn
+        return None
+    
     def __eq__(self, other):
         if not isinstance(other, Vertex):
             return False
@@ -120,6 +128,7 @@ class Vertex(QGraphicsEllipseItem):
 
     def add_connection(self, edge):
         self.connections.append(edge)
+
 
     def mouseMoveEvent(self, event):
         super().mouseMoveEvent(event)
@@ -153,7 +162,8 @@ class Vertex(QGraphicsEllipseItem):
             
 
     def remove(self):
-        for edge in self.connections[::-1]:
+        list_of_conn = self.connections
+        for edge in list_of_conn:
             edge.remove()
 
         self.connections.clear()
@@ -169,7 +179,7 @@ class Vertex(QGraphicsEllipseItem):
         if self.node.visited:
             self.change_color(Vertex_Colors["visited"])
         else:
-            self.change_color(Vertex_Colors("unvisited"))
+            self.change_color(Vertex_Colors["unvisited"])
 
     def clear_value(self):
         self.value.setPlainText('')
@@ -424,9 +434,9 @@ class MainWindow(QMainWindow):
         # example nodes
         self.nodes.extend([Node(0, 100, 100), Node(1, 200, 200), Node(2, 300, 100)])
         nodes = [Node(0, 100, 100), Node(1, 200, 200), Node(2, 300, 100)]
-        nodes[0].connect(nodes[1], False)
+        nodes[0].connect(nodes[1],directed=checks.get("Directed", False) )
         # nodes[0].connect(nodes[2], False)
-        nodes[2].connect(nodes[1], False)
+        nodes[2].connect(nodes[1], directed=checks.get("Directed", False))
 
         # Create a dictionary to store vertex objects
         self.vertices: Dict[int: Vertex] = {}
@@ -452,7 +462,8 @@ class MainWindow(QMainWindow):
             # self.scene.addItem(line)
             # if checks.get("Directed", False):
             #     line.add_arrowhead_to_scene()
-
+        for v in self.vertices.values():
+            v.show()
         # Initialize UI #
 
         # Create grid and buttons
@@ -483,6 +494,12 @@ class MainWindow(QMainWindow):
         
         self.prev_step_button = QPushButton("Previous", self)
         self.prev_step_button.setEnabled(False)
+
+        self.first_step_button = QPushButton("To Start", self)
+        self.first_step_button.setEnabled(False)
+
+        self.last_step_button = QPushButton("To End", self)
+        self.last_step_button.setEnabled(False)
 
         # return button
         self.back_button = QPushButton("Back", self)
@@ -521,9 +538,13 @@ class MainWindow(QMainWindow):
         self.grid.addWidget(self.save_graph_button, 1, 8, Qt.AlignRight | Qt.AlignBottom)
         self.grid.addWidget(self.load_graph_button, 1, 9, Qt.AlignRight | Qt.AlignBottom)
         
-        self.grid.addWidget(self.next_step_button, 0, 9, 1, 1, Qt.AlignTop | Qt.AlignRight)
-        self.grid.addWidget(self.prev_step_button, 0, 8, 1, 1, Qt.AlignTop | Qt.AlignRight)
+        self.grid.addWidget(self.next_step_button, 0, 8, 1, 1, Qt.AlignTop | Qt.AlignRight)
+        self.grid.addWidget(self.prev_step_button, 0, 7, 1, 1, Qt.AlignTop | Qt.AlignRight)
+        self.grid.addWidget(self.first_step_button, 0, 6, 1, 1, Qt.AlignTop | Qt.AlignRight)
+        self.grid.addWidget(self.last_step_button, 0, 9, 1, 1, Qt.AlignTop | Qt.AlignRight)
+
         self.grid.addWidget(self.back_button, 0, 0, 1, 2, Qt.AlignTop | Qt.AlignLeft)
+
 
         self.grid.setColumnStretch(3, 1)
         self.grid.setSpacing(0)
@@ -541,12 +562,27 @@ class MainWindow(QMainWindow):
         self.load_graph_button.setEnabled(edit_mode)
         self.algorithm_button.setEnabled(edit_mode)
 
+    def update_run_buttons(self, run_mode=True):
+        self.last_step_button.setEnabled(self.algorythm.check_next()& run_mode)
+        self.next_step_button.setEnabled(self.algorythm.check_next()& run_mode)
+        self.first_step_button.setEnabled(self.algorythm.check_prev()& run_mode)
+        self.prev_step_button.setEnabled(self.algorythm.check_prev()& run_mode)
+    
+    def run_button_clicked(self, function):
+        function()
+        self.update_run_buttons()
+
     def set_run_buttons(self, run_mode : bool):
         '''
-        sets next and previous buttons 'Enabled' status to [run_mode]
+        sets steps settings buttons 'Enabled' status to [run_mode]
         '''
-        self.next_step_button.setEnabled(run_mode)
-        self.prev_step_button.setEnabled(run_mode)
+        self.update_run_buttons(run_mode)
+        if run_mode:
+            self.first_step_button.clicked.connect(lambda : self.run_button_clicked(self.algorythm.to_first))
+            self.next_step_button.clicked.connect(lambda : self.run_button_clicked(self.algorythm.next))
+            self.prev_step_button.clicked.connect(lambda : self.run_button_clicked(self.algorythm.prev))
+            self.last_step_button.clicked.connect(lambda : self.run_button_clicked(self.algorythm.to_last))
+
 
     def create_vertex(self, node: Node):
         # Create a QGraphicsTextItem to hold the node index
@@ -672,11 +708,10 @@ class MainWindow(QMainWindow):
                 return
 
             # check if there is already an edge between the vertices
-            for edge in origin.connections:
-                if edge.end == end:
-                    QMessageBox.warning(dialog, "Warning", "There is already an edge between these vertices.\
-                    Program does not support multigraphs.")
-                    return
+            if origin.node.get_edge(end_id):
+                QMessageBox.warning(dialog, "Warning", "There is already an edge between these vertices.\
+                Program does not support multigraphs.")
+                return
 
             if not checks.get("Unweighted", False):
                 if not value:
@@ -732,6 +767,7 @@ class MainWindow(QMainWindow):
 
         # Show
         dialog.exec_()
+
 
     def starting_window(self):
         # create a new dialog window
@@ -824,16 +860,59 @@ class MainWindow(QMainWindow):
             self.__init__()
 
 
-    def turn_run_mode(self, dialog_window):####
+    def turn_run_mode(self, dialog_window, algo_name):####
+
+
+        self.algorythm : BFS= algorythms[algo_name](self.vertices)
+        def acceptence():
+            if self.algorythm.constrains(params[i], int(input.text())):
+                self.algorythm.set_parameters(params[i], int(input.text()))
+                param_dialog.accept()
+            else:
+                QMessageBox.warning(param_dialog, "Warning",
+                                        "Wrong parameter value")
+
+        # taking parameters needed for algorythm to start
+        i = 0
+        params = self.algorythm.get_parameters_name()
+        while i < len(params):
+            param_dialog = QDialog(self)
+            param_dialog.setWindowTitle("Insert value of parameter")
+            param_dialog.setGeometry(300, 300, 300, 100)
+            param_dialog.setModal(True)
+
+            layout = QVBoxLayout()
+            accept_button = QPushButton("Accept")
+            label = QLabel(params[i])
+            input = QLineEdit()
+
+            layout.addWidget(label)
+            layout.addWidget(input)
+            layout.addWidget(accept_button)
+
+            accept_button.clicked.connect(acceptence)
+
+            param_dialog.setLayout(layout)
+            exit_value = param_dialog.exec_()
+            if exit_value != QDialog.Accepted:
+                self.algorythm = None
+                return 
+            i += 1
+
+        # seting up
+        
         self.set_edit_buttons(False)
         modes["Run"] = True
         self.mode_labels["Run"].setVisible(True)
+        self.algorythm.start()
         self.set_run_buttons(True)
         dialog_window.accept()
 
     def turn_edit_mode(self):
         self.set_run_buttons(False)
+        self.algorythm.to_first()
         modes["Run"] = False
+        self.algorythm = None
         self.mode_labels["Run"].setVisible(False)
         self.set_edit_buttons(True)
         
@@ -871,7 +950,7 @@ class MainWindow(QMainWindow):
         category_combo.currentIndexChanged.connect(update_algorithms)
 
 
-        run_button.clicked.connect(lambda : self.turn_run_mode(dialog)) # lambda because it must be function
+        run_button.clicked.connect(lambda : self.turn_run_mode(dialog, algorithm_combo.currentText())) # lambda because it must be function
         # Create the second dropdown list
         dialog.setLayout(layout)
         dialog.exec_()

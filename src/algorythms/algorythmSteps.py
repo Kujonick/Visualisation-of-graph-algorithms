@@ -17,6 +17,7 @@ class AlgorythmSteps:
         self.index = -1
 
     def add_step(self, func , args, states )-> None:
+        self.index += 1
         self.steps.append((func, args, states))
 
     def pop_step(self) -> None:
@@ -25,6 +26,12 @@ class AlgorythmSteps:
     def clear_states(self) -> None:
         self.steps = []
 
+    def check_next(self):
+        return self.index < len(self.steps) - 1
+    
+    def check_prev(self):
+        return self.index > -1
+    
     def next_step(self) -> tuple:
         if self.index < len(self.steps) -1:
             self.index += 1 
@@ -51,15 +58,15 @@ class AlgorythmSteps:
         output = "START ->"
         if self.index > -1:
             x = self.steps[self.index-1]
-            output = f"({x[0].__name__},{x[1]},{x[2]}) ->"
+            output = f"({x[0].__name__},{str(x[1])},{str(x[2])}) ->"
             if self.index > 0:
                 x = self.steps[self.index]
-                output = f"({x[0].__name__},{x[1]},{x[2]})" + output
+                output = f"({x[0].__name__},{str(x[1])},{str(x[2])})" + output
         if self.index < len(self.steps) -1:
             x = self.steps[self.index+1]
-            output = output + f" -> ({x[0].__name__},{x[1]},{x[2]})"
+            output = output + f" -> ({x[0].__name__},{str(x[1])},{str(x[2])})"
         print(output)
-
+    
 if __name__ == "__main__":
     Steps = AlgorythmSteps()
     def test_a():

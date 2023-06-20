@@ -15,12 +15,14 @@ class Algorytm:
         self.verticies = verticies
         self.nodes : dict[int : Node]= {i : self.verticies[i].node for i in verticies}
         self.selectedID : int = None
+        self.selected_connections = []
 
     # Vericies
     def change_visited(self, args, state):
         node : Node = args[0]
         node.change_visited(state)
-        self.verticies[node.id].changed_visited()
+        self.verticies[node.id].changed_state()
+        print(f"changing {node.id} visited to {state}")
 
     def change_value(self, args, value):
         node : Node = args[0]
@@ -39,29 +41,37 @@ class Algorytm:
         edge : Edge = args[0]
         edge.change_flow_to(next_flow)
         edge.connection.uptade_cost()
+    
+    def set_connections_selected(self, args, next_selected):
+        for connection in self.selected_connections:
+            connection.set_unselected()
+        self.selected_connections = next_selected.copy()
+        for connection in self.selected_connections:
+            connection.set_selected()
     #-------------------------------
 
-    def write_change_visited(self, node : Node, state ):
+    def write_change_visited(self, node : int, state ):
         if isinstance(node, int):
             node = self.nodes.get(node)
         prev = node.visited
-        self.change_visited((node), state)
-        self.steps.add_step(self.change_visited,(node), (prev, state))
+        self.change_visited((node,), state)
+        self.steps.add_step(self.change_visited,(node,), (prev, state))
         
 
-    def write_change_value(self, node : Node, value ):
+    def write_change_value(self, node : int, value ):
         if isinstance(node, int):
             node = self.nodes.get(node)
         prev = node.value
-        self.change_value((node), value)
-        self.steps.add_step(self.change_value,(node) ,(prev, value))
+        self.change_value((node,), value)
+        self.steps.add_step(self.change_value,(node,) ,(prev, value))
         
     
     def write_select(self, node : int):
         if isinstance(node, Node):
             node = node.id
-        self.selection(None, node)
         self.steps.add_step(self.selection,None, (self.selectedID, node))
+        self.selection(None, node)
+        
         
     
     # Edges
@@ -71,11 +81,21 @@ class Algorytm:
         if value > edge.maxflow:
             raise ValueError("Wrong flow value > maxflow")
         self.change_flow((edge), value)
-        self.steps.add_step(self.change_flow,(edge) ,(prev, value))
+        self.steps.add_step(self.change_flow,(edge,) ,(prev, value))
+
+    def write_selected_connections(self, connections):
+        self.steps.add_step(self.set_connections_selected, (), (self.selected_connections, connections))
+        self.set_connections_selected([], connections)
 
     # Using
+    def check_next(self):
+        return self.steps.check_next()
+
+    def check_prev(self):
+        return self.steps.check_prev()
 
     def next(self):
+        self.steps.show_current_step()
         x = self.steps.next_step()
         if x == None:
             return
@@ -83,6 +103,7 @@ class Algorytm:
         f(args, states[1])
     
     def prev(self):
+        self.steps.show_current_step()
         x = self.steps.previous_step()
         if x == None:
             return
@@ -103,6 +124,6 @@ class Algorytm:
             if x == None:
                 return
             f, args, states = x
-            f(args, states[0])
+            f(args, states[1])
             
         
