@@ -16,6 +16,7 @@ from algorythms.Primitive import BFS, DFS
 
 modes = {
     "Add Vertex": False,
+    "Add Edge": False,
     "Delete Vertex/Edge": False,
     "Run" : False
 }
@@ -164,8 +165,8 @@ class Vertex(QGraphicsEllipseItem):
 
     def remove(self):
         list_of_conn = self.connections
-        for edge in list_of_conn:
-            edge.remove()
+        for conn in list_of_conn[::-1]:
+            conn.remove()
 
         self.connections.clear()
         self.scene().vertex_deleted_sig.emit(self.node.id)
@@ -431,6 +432,8 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Visualization of graph algorythms")
         self.setGeometry(100, 100, 800, 600)
 
+        self.view.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)  # Wyłączenie pionowego paska przewijania
+        self.view.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         # Add the view to the window
         self.setCentralWidget(self.view)
 
@@ -456,6 +459,12 @@ class MainWindow(QMainWindow):
         if checks.get("Directed", False):
             for edge in edges:
                 edge.directed = True
+        if checks.get("Weighted", False):
+            for edge in edges:
+                edge.set_cost(1)
+        if checks.get("Flow", False):
+            for edge in edges:
+                edge.set_maxflow(1)
         for edge in edges:
             connection: Connection = self.create_edge(edge)
             self.scene.addItem(connection)
@@ -508,6 +517,12 @@ class MainWindow(QMainWindow):
         self.back_button = QPushButton("Back", self)
         self.back_button.clicked.connect(self.back_button_action)
 
+
+        self.first_step_button.clicked.connect(lambda : self.run_button_clicked(self.algorythm.to_first))
+        self.next_step_button.clicked.connect(lambda : self.run_button_clicked(self.algorythm.next))
+        self.prev_step_button.clicked.connect(lambda : self.run_button_clicked(self.algorythm.prev))
+        self.last_step_button.clicked.connect(lambda : self.run_button_clicked(self.algorythm.to_last))
+
         # Editing Modes
         self.previous_mode = None
 
@@ -553,6 +568,22 @@ class MainWindow(QMainWindow):
         self.grid.setSpacing(0)
         self.grid.setContentsMargins(0, 0, 0, 0)
 
+    def keyPressEvent(self, event):
+        key = event.key()
+        
+        if key == Qt.Key_Left:
+            # Obsługa ruchu w lewo
+            self.move(self.x() - 10, self.y())
+        elif key == Qt.Key_Right:
+            # Obsługa ruchu w prawo
+            self.move(self.x() + 10, self.y())
+        elif key == Qt.Key_Up:
+            # Obsługa ruchu w górę
+            self.move(self.x(), self.y() - 10)
+        elif key == Qt.Key_Down:
+            # Obsługa ruchu w dół
+            self.move(self.x(), self.y() + 10)
+
     # sets modification buttons on and off
     def set_edit_buttons(self, edit_mode : bool): 
         '''
@@ -580,11 +611,6 @@ class MainWindow(QMainWindow):
         sets steps settings buttons 'Enabled' status to [run_mode]
         '''
         self.update_run_buttons(run_mode)
-        if run_mode:
-            self.first_step_button.clicked.connect(lambda : self.run_button_clicked(self.algorythm.to_first))
-            self.next_step_button.clicked.connect(lambda : self.run_button_clicked(self.algorythm.next))
-            self.prev_step_button.clicked.connect(lambda : self.run_button_clicked(self.algorythm.prev))
-            self.last_step_button.clicked.connect(lambda : self.run_button_clicked(self.algorythm.to_last))
 
 
     def create_vertex(self, node: Node):
@@ -643,9 +669,7 @@ class MainWindow(QMainWindow):
         return line
 
     def add_edge(self):
-        if self.previous_mode is not None:
-            modes[self.previous_mode] = False
-            self.mode_labels[self.previous_mode].setVisible(False)
+        self.turn_off_modes()
 
         # create a new dialog window
         dialog = QDialog(self)
@@ -771,6 +795,11 @@ class MainWindow(QMainWindow):
         # Show
         dialog.exec_()
 
+    def turn_off_modes(self):
+        for mode in modes:
+            modes[mode] = False
+        if self.previous_mode is not None:
+            self.mode_labels[self.previous_mode].setVisible(False)
 
     def starting_window(self):
         # create a new dialog window
@@ -915,7 +944,11 @@ class MainWindow(QMainWindow):
         # seting up
         
         self.set_edit_buttons(False)
+        self.turn_off_modes()
+        self.previous_mode = "Run"
         modes["Run"] = True
+        for vert in self.vertices.values():
+            vert.node.change_visited(False)
         self.mode_labels["Run"].setVisible(True)
         self.algorythm.start()
         self.set_run_buttons(True)
@@ -968,17 +1001,34 @@ class MainWindow(QMainWindow):
         dialog.setLayout(layout)
         dialog.exec_()
 
+
+    
+    def get_extension(self):
+        def complete_enxtenstion(check, present, other):
+            if checks.get(check, False):
+                extension.append(present)
+            else:
+                extension.append(other)
+
+        extension = []
+        complete_enxtenstion('Undirected','u','d')
+        complete_enxtenstion('Unweighted','u','w')
+        complete_enxtenstion('No Value','n','v')
+        return '.'+''.join(extension)
     # Saves .nodes to file named by user
     def save_to_file(self):
 
         def saving_button():
             filename = filename_input.text()
-            for sign in '#%&*{/\\}?:@:"\'!`|=+<>':
+            for sign in '.#%&*{/\\}?:@:"\'!`|=+<>':
                 if sign in filename:
                     QMessageBox.warning(dialog, "Warning",
-                                        "Wrong filename, use only letters, numbers, signs like '_-,.'")
+                                        "Wrong filename, use only letters, numbers, signs like '_-,'")
                     return
-            graph_save([v.node for v in self.vertices.values()], filename)
+            
+            
+            form = self.get_extension()
+            graph_save([v.node for v in self.vertices.values()], filename+form)
             dialog.close()
             return
 
@@ -987,7 +1037,7 @@ class MainWindow(QMainWindow):
         dialog.setGeometry(300, 300, 300, 100)
         dialog.setModal(True)
 
-        filename_label = QLabel("Filename (recomended .txt):")
+        filename_label = QLabel("Filename (dont use formats):")
         filename_input = QLineEdit()
         confirm_button = QPushButton("Save")
 
@@ -1006,13 +1056,14 @@ class MainWindow(QMainWindow):
 
         def loading_button():
             filename = filename_input.text()
-            for sign in '#%&*{/\\}?:@:"\'!`|=+<>':
+            for sign in '#%&*{/\\}?:@.:"\'!`|=+<>':
                 if sign in filename:
                     QMessageBox.warning(dialog, "Warning",
-                                        "Wrong filename, use only letters, numbers, signs like '_-,.'")
+                                        "Wrong filename, use only letters, numbers, signs like '_-,'")
                     return
             try:
-                nodes: list[Node] = graph_read(filename)
+                form = self.get_extension()
+                nodes: list[Node] = graph_read(filename+form)
                 vertices: list[Vertex] = [x for x in self.vertices.values()]
                 for x in vertices:
                     x.remove()
@@ -1042,7 +1093,7 @@ class MainWindow(QMainWindow):
         dialog.setGeometry(300, 300, 300, 100)
         dialog.setModal(True)
 
-        filename_label = QLabel("Filename: ")
+        filename_label = QLabel("Filename (don't write format): ")
         filename_input = QLineEdit()
         confirm_button = QPushButton("Load")
 

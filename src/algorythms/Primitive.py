@@ -37,11 +37,9 @@ class BFS (PathSearch):
             v = Q.popleft()
             if self.nodes[v].visited:
                 continue
-            self.write_select(v)
-            if t == v:
-                self.write_select(None)
-                break
             self.write_change_visited(v,True)
+            if t == v:
+                break
             for u in self.nodes[v].edges:
                 if not self.nodes[u].visited:
                     if parent.get(u,None) == None:
@@ -67,21 +65,18 @@ class DFS (PathSearch):
         s = self.parameters["s"]
         t = self.parameters["t"]
         Q = deque()
-        Q.append(s)
+        Q.append((s, None))
         parent = {}
         while Q:
-            v = Q.pop()
+            v, p= Q.pop()
             if self.nodes[v].visited:
                 continue
-            self.write_select(v)
-            if t == v:
-                self.write_select(None)
-                break
+            parent[v] = p
             self.write_change_visited(v,True)
+            if t == v:
+                break
             for u in self.nodes[v].edges:
                 if not self.nodes[u].visited:
-                    if parent.get(u,None) == None:
-                        parent[u] = v
                     Q.append(u)
         else:
             return

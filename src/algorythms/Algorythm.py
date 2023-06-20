@@ -95,16 +95,16 @@ class Algorytm:
         return self.steps.check_prev()
 
     def next(self):
-        self.steps.show_current_step()
         x = self.steps.next_step()
+        self.steps.show_current_step()
         if x == None:
             return
         f, args, states = x
         f(args, states[1])
     
     def prev(self):
-        self.steps.show_current_step()
         x = self.steps.previous_step()
+        self.steps.show_current_step()
         if x == None:
             return
         f, args, states = x

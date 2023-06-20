@@ -5,7 +5,7 @@ module_path = os.path.abspath("src")
 if module_path not in sys.path:
     sys.path.append(module_path)
 
-from typing import List, Any, Tuple
+from typing import List, Any, Tuple, Sequence
 from graphs import Node, Edge
 
 # algorythm's steps
@@ -54,17 +54,29 @@ class AlgorythmSteps:
             self.index -= 1
         return 
     
+    def _step_to_string(self,step):
+        if step[1] != None:
+            x = ' '+ ' '.join(str(e) for e in step[1])
+        else:
+            x = 'None'
+        y = ''
+        for state in step[2]:
+            if issubclass(type(state),Sequence):
+                y = y+'{\n'+ '\n'.join(str(e) for e in state) + ' }'
+            else:
+                y = y +' '+ str(state)
+
+        return f"({step[0].__name__},{x},{y})"
+
     def show_current_step(self):
-        output = "START ->"
+        print(f"{self.index} / {len(self.steps) -1 }")
+        output = " EMPTY "
         if self.index > -1:
-            x = self.steps[self.index-1]
-            output = f"({x[0].__name__},{str(x[1])},{str(x[2])}) ->"
+            output = self._step_to_string(self.steps[self.index]) + ' |'
             if self.index > 0:
-                x = self.steps[self.index]
-                output = f"({x[0].__name__},{str(x[1])},{str(x[2])})" + output
+                output = f"{self._step_to_string(self.steps[self.index-1])} > {output}"
         if self.index < len(self.steps) -1:
-            x = self.steps[self.index+1]
-            output = output + f" -> ({x[0].__name__},{str(x[1])},{str(x[2])})"
+            output = f"{output} >> {self._step_to_string(self.steps[self.index+1])}"
         print(output)
     
 if __name__ == "__main__":
@@ -75,10 +87,10 @@ if __name__ == "__main__":
     def test_b():
         return 
     
-    Steps.add_step(test_a, (), (0, 1))
+    Steps.add_step(test_a, [], (0, 1))
     Steps.show_current_step()
-    assert(Steps.next_step() == (test_a,(), (0, 1)))
-    Steps.add_step(test_b, (1), (2, 3))
-    assert(Steps.next_step()== (test_b,(1), (2, 3)))
-    assert(Steps.previous_step() == (test_b,(1), (2, 3)))
-    assert(Steps.previous_step() == (test_a,(), (0, 1)))
+    assert(Steps.previous_step() == (test_a,[], (0, 1)))
+    Steps.next_step()
+    Steps.add_step(test_b, [1], (2, 3))
+    assert(Steps.previous_step() == (test_b,[1], (2, 3)))
+    assert(Steps.previous_step() == (test_a,[], (0, 1)))
