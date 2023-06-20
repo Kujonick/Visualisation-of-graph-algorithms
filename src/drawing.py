@@ -12,7 +12,7 @@ from savers import graph_save, graph_read
 from errors import FileReadError
 
 from algorythms.algorythmSteps import AlgorythmSteps
-from algorythms.BFS import BFS
+from algorythms.Primitive import BFS, DFS  
 
 modes = {
     "Add Vertex": False,
@@ -23,13 +23,14 @@ modes = {
 checks = {}
 
 algorythms_names = {
-    "Primitive": ["BFS", "algo2", "algo3"],
+    "Primitive": ["BFS", "DFS"],
     "2": ["algo4", "algo5", "algo6"],
     "3": ["algo7", "algo8", "algo9"]
 }
 
 algorythms = {
-    "BFS" : BFS
+    "BFS" : BFS,
+    "DFS" : DFS
 }
 
 Vertex_Colors = {
@@ -368,10 +369,12 @@ class Connection(QGraphicsLineItem):
 
     def set_selected(self):
         pen = QPen(Qt.red)
+        pen.setWidth(2)
         self.setPen(pen)
 
     def set_unselected(self):
         pen = QPen(Qt.black)
+        pen.setWidth(2)
         self.setPen(pen)
 
     def update_weight(self):
