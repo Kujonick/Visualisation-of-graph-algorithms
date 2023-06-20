@@ -112,17 +112,11 @@ class Algorytm:
 
     def to_first(self):
         for x in self.steps.to_first():
-            x = self.steps.previous_step()
-            if x == None:
-                return
             f, args, states = x
             f(args, states[0])
 
     def to_last(self):
         for x in self.steps.to_last():
-            x = self.steps.previous_step()
-            if x == None:
-                return
             f, args, states = x
             f(args, states[1])
             

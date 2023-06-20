@@ -865,8 +865,18 @@ class MainWindow(QMainWindow):
 
         self.algorythm : BFS= algorythms[algo_name](self.vertices)
         def acceptence():
-            if self.algorythm.constrains(params[i], int(input.text())):
-                self.algorythm.set_parameters(params[i], int(input.text()))
+            text = input.text()
+            if len(text) == 0:
+                QMessageBox.warning(param_dialog, "Warning",
+                                        "Empty input")
+                return
+            for sign in text:
+                if sign not in '0123456789':
+                    QMessageBox.warning(param_dialog, "Warning",
+                                        "Use only numbers")
+                    return
+            if self.algorythm.constrains(params[i], int(text)):
+                self.algorythm.set_parameters(params[i], int(text))
                 param_dialog.accept()
             else:
                 QMessageBox.warning(param_dialog, "Warning",
