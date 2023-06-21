@@ -414,6 +414,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         # Run Starting Window
         self.starting_window()
+        self.changed_graph_options = False
         if not checks:
             sys.exit()
 
@@ -577,10 +578,6 @@ class MainWindow(QMainWindow):
                 edge.set_maxflow(1)
         for edge in edges:
             connection: Connection = self.create_connection(edge)
-            # line = self.create_edge(edge)
-            # self.scene.addItem(line)
-            # if checks.get("Directed", False):
-            #     line.add_arrowhead_to_scene()
         for v in self.vertices.values():
             v.show()
 
@@ -842,6 +839,7 @@ class MainWindow(QMainWindow):
                 if check.isChecked():
                     checks[check.text()] = True
             print(checks)
+            self.changed_graph_options = True
             dialog.accept()
 
         create_button.clicked.connect(create_graph)
@@ -859,12 +857,15 @@ class MainWindow(QMainWindow):
         if modes["Run"]:
             self.turn_edit_mode()
         else:
-            self.vertices.clear()
-            self.nodes.clear()
-            self.scene.clear()
-            checks.clear()
             self.starting_window()
-            self.initialize_graph()
+            if self.changed_graph_options:
+                self.changed_graph_options = False
+                self.vertices.clear()
+                self.nodes.clear()
+                self.scene.clear()
+                self.turn_off_modes()
+                checks.clear()
+                self.initialize_graph()
 
 
 
