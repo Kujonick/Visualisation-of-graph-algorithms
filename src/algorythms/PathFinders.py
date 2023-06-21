@@ -1,8 +1,4 @@
-import sys, os
-module_path = os.path.abspath("src/algorythms")
-sys.path.append(module_path)
-
-from Algorythm import PathSearch
+from algorythms.Algorythm import PathSearch
 from heapq import heapify, heappop, heappush, heappushpop, heapreplace
 
 class Dijkstra(PathSearch):

@@ -1,11 +1,7 @@
 
 import sys, os
-module_path = os.path.abspath("src")
 
-# Dodaj ścieżkę do sys.path
-sys.path.append(module_path)
-
-from algorythmSteps import AlgorythmSteps
+from algorythms.algorythmSteps import AlgorythmSteps
 #from drawing import Vertex, Connection
 from graphs import Node, Edge
 

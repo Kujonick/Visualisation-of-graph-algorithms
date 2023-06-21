@@ -49,17 +49,17 @@ class Node:
         return self.edges.get(id, None)
     
     # adds new Edge to Node.edges.  Returns False if nothing's changed
-    def connect(self, other, directed : bool, maxflow :int=None, minflow:int=None, cost:int = None) -> bool:
+    def connect(self, other, directed : bool, maxflow :int=None, minflow:int=None, cost:int = None):
         if not isinstance(other,Node):
             raise WrongTypeConnect
         
         
         if self.get_edge(other) != None:    # Edge already exists
-            return False
+            return None
         
         
         if not directed and other.get_edge(self) != None:  # Edge of undirected graph shan't be connected to Node which has already directed Edge to this one 
-            return False                                        # It should not accur frequently, but must be handled
+            return None                                        # It should not accur frequently, but must be handled
         
 
         edge = Edge(self, other, directed, maxflow=maxflow, minflow=minflow, cost=cost)
@@ -67,7 +67,7 @@ class Node:
         if not directed:
              other.edges[self.id] = edge
         
-        return True
+        return edge
     
     # deletes Edge in .edges
     def disconnect(self, other) -> bool:
