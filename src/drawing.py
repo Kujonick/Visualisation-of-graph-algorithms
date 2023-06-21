@@ -72,7 +72,7 @@ def get_vertex_value():
 
 
 class Vertex(QGraphicsEllipseItem):
-    
+    window = None
     def __init__(self, node: Node):
         super().__init__(node.x, node.y, 34, 34)
         # Remember initial position of vertex for mouseReleaseEvent
@@ -82,16 +82,15 @@ class Vertex(QGraphicsEllipseItem):
         # Set the pen and brush for the vertex
         pen = QPen(Qt.black)
         pen.setWidth(2)
-        brush = QBrush(QColor(194, 223, 255))
         self.setPen(pen)
-        self.setBrush(brush)
+        
 
         # Make the vertex movable
         self.setFlag(self.ItemIsMovable)
         # Store a reference to the Node object
         self.node: Node = node
         node.vertex = self
-
+        self.changed_state()
         # Store edges of the Vertex
         self.connections = []
 
@@ -145,7 +144,18 @@ class Vertex(QGraphicsEllipseItem):
         if event.button() == Qt.LeftButton and modes["Delete Vertex/Edge"]:
             self.remove()
             return
+        
+        if event.button() == Qt.LeftButton and modes["Add Edge"]:
+            if self.window.selected is None:
+                self.window.select_origin_vertex(self)
 
+            elif self == self.window.selected:
+                self.window.unselect_origin_vertex()
+
+            else:
+                self.window.add_new_edge(self)
+            
+        
         if event.button() == Qt.RightButton and checks.get("With Value", False) and not modes["Run"]:
             
             value = get_vertex_value()
@@ -407,6 +417,10 @@ class MainWindow(QMainWindow):
         if not checks:
             sys.exit()
 
+        # setting up verticies
+        Vertex.window = self
+        self.selected :Vertex = None
+
         if checks.get("Weighted", False):
             algorythms_names["PathFinders"] = ["Dijkstra"]
 
@@ -466,10 +480,9 @@ class MainWindow(QMainWindow):
             for edge in edges:
                 edge.set_maxflow(1)
         for edge in edges:
-            connection: Connection = self.create_edge(edge)
-            self.scene.addItem(connection)
-            if checks.get("Directed", False):
-                connection.add_arrowhead_to_scene()
+            connection: Connection = self.create_connection(edge)
+            
+
             # line = self.create_edge(edge)
             # self.scene.addItem(line)
             # if checks.get("Directed", False):
@@ -487,7 +500,7 @@ class MainWindow(QMainWindow):
         self.add_vertex_mode_button = QPushButton("Add Vertex", self)
         self.add_vertex_mode_button.clicked.connect(self.buttons_handler)
         self.add_edge_mode_button = QPushButton("Add Edge", self)
-        self.add_edge_mode_button.clicked.connect(self.add_edge)
+        self.add_edge_mode_button.clicked.connect(self.buttons_handler)
 
         # # Algorythm button
         self.algorithm_button = QPushButton("Algorithms...", self)
@@ -528,22 +541,27 @@ class MainWindow(QMainWindow):
 
 
         # Labels
+        add_vertex_mode_label = QLabel(self)
         add_edge_mode_label = QLabel(self)
         delete_mode_label = QLabel(self)
         run_mode_label = QLabel(self)
-        add_edge_mode_label.setText("ADD VERTEX MODE ENABLED")
+        add_vertex_mode_label.setText("ADD VERTEX MODE ENABLED")
+        add_vertex_mode_label.setVisible(False)
+        add_edge_mode_label.setText("ADD EDGE MODE ENABLED")
         add_edge_mode_label.setVisible(False)
         delete_mode_label.setText("DELETE MODE ENABLED")
         delete_mode_label.setVisible(False)
         run_mode_label.setText("RUNNING")
         run_mode_label.setVisible(False)
         self.mode_labels = {
-            "Add Vertex": add_edge_mode_label,
+            "Add Vertex": add_vertex_mode_label,
+            "Add Edge": add_edge_mode_label,
             "Delete Vertex/Edge": delete_mode_label,
             "Run": run_mode_label 
         }
 
         # Adding all labels to viev
+        self.grid.addWidget(add_vertex_mode_label, 0, 3, Qt.AlignTop | Qt.AlignCenter)
         self.grid.addWidget(add_edge_mode_label, 0, 3, Qt.AlignTop | Qt.AlignCenter)
         self.grid.addWidget(delete_mode_label, 0, 3, Qt.AlignTop | Qt.AlignCenter)
         self.grid.addWidget(run_mode_label, 0, 3, Qt.AlignTop | Qt.AlignCenter)
@@ -651,7 +669,7 @@ class MainWindow(QMainWindow):
         self.vertices[node.id] = vertex
         self.scene.addItem(vertex)
 
-    def create_edge(self, edge):
+    def create_connection(self, edge):
         # Create an edge to represent the connection between two vertices
         origin_vertex = self.vertices[edge.origin.id]
         end_vertex = self.vertices[edge.end.id]
@@ -664,83 +682,40 @@ class MainWindow(QMainWindow):
         # Add the edge to the origin/end vertex's edges list
         origin_vertex.add_connection(line)
         end_vertex.add_connection(line)
+        self.scene.addItem(line)
 
-        # Return the edge
+        if checks.get("Directed", False):
+            line.add_arrowhead_to_scene()
+        # Return the connection
         return line
 
-    def add_edge(self):
-        self.turn_off_modes()
+    def select_origin_vertex(self, vertex:Vertex):
+        self.selected = vertex
+        vertex.set_selected()
 
-        # create a new dialog window
-        dialog = QDialog(self)
-        dialog.setWindowTitle("Add Edge")
-        dialog.setGeometry(300, 300, 300, 100)
-        dialog.setModal(True)
+    def unselect_origin_vertex(self):
+        if self.selected is not None:
+            self.selected.set_unselected()
+            self.selected = None
 
-        # create labels and text inputs for origin and end vertices
-        origin_label = QLabel("Origin:")
-        origin_input = QLineEdit()
-        end_label = QLabel("End:")
-        end_input = QLineEdit()
-        
 
-        # create button to connect vertices
-        connect_button = QPushButton("Connect")
+    def add_new_edge(self, vertex):
+        origin : Vertex = self.selected
+        end : Vertex = vertex
+        if origin == end:
+            QMessageBox.warning(None, "Warning", "Program does not support multigraphs - loops are not allowed.")
+            return
 
-        # layout for the dialog window
-        layout = QVBoxLayout()
-        layout.addWidget(origin_label)
-        layout.addWidget(origin_input)
-        layout.addWidget(end_label)
-        layout.addWidget(end_input)
+        # check if there is already an edge between the vertices
+        if origin.node.get_edge(end.node.id):
+            QMessageBox.warning(None, "Warning", "There is already an edge between these vertices.\
+            Program does not support multigraphs.")
+            return
+
         if not checks.get("Unweighted", False):
-            if checks.get("Weighted", False):
-                value_label = QLabel("Weight:")
-            else:
-                value_label = QLabel("Maxflow:")
-            value_input = QLineEdit()
-            layout.addWidget(value_label)
-            layout.addWidget(value_input)
 
-        layout.addWidget(connect_button)
-        dialog.setLayout(layout)
-
-        def connect_vertices():
-            # get the origin and end vertices from the input fields
-            origin_id = origin_input.text()
-            end_id = end_input.text()
-
-            if not checks.get("Unweighted", False):
+            def check_value():
                 value = value_input.text()
-
-            # check if the input fields are not empty
-            if not origin_id or not end_id:
-                QMessageBox.warning(dialog, "Warning", "Please enter values for both origin and end vertices.")
-                return
-
-            origin_id = int(origin_id)
-            end_id = int(end_id)
-
-            # check if the origin and end vertices exist in the graph
-            if self.vertices.get(origin_id, -1) == -1 or self.vertices.get(end_id, -1) == -1:
-                QMessageBox.warning(dialog, "Warning", "One or both of the vertices do not exist in the graph.")
-                return
-
-            origin: Vertex = self.vertices[origin_id]
-            end: Vertex = self.vertices[end_id]
-
-            # check if origin is the same vertex as end
-            if origin == end:
-                QMessageBox.warning(dialog, "Warning", "Program does not support multigraphs - loops are not allowed.")
-                return
-
-            # check if there is already an edge between the vertices
-            if origin.node.get_edge(end_id):
-                QMessageBox.warning(dialog, "Warning", "There is already an edge between these vertices.\
-                Program does not support multigraphs.")
-                return
-
-            if not checks.get("Unweighted", False):
                 if not value:
                     QMessageBox.warning(dialog, "Warning", "Please enter the weight of the edge.")
 
@@ -757,43 +732,41 @@ class MainWindow(QMainWindow):
                         QMessageBox.warning(dialog, "Warning",
                                             "Only numbers [1-9][0-9]*, no floats")
                         return
-                
+                dialog.accept()
+                    
+            dialog = QDialog(self)
+            dialog.setWindowTitle("Add Edge")
+            dialog.setGeometry(300, 300, 300, 100)
+            dialog.setModal(True)
 
-            # connecting node
+            layout = QVBoxLayout()
+
+            if checks.get("Weighted", False):
+                value_label = QLabel("Weight:")
+            else:
+                value_label = QLabel("Maxflow:")
+            value_input = QLineEdit()
+            layout.addWidget(value_label)
+            layout.addWidget(value_input)
+
+            connect_button = QPushButton("Connect")
+            layout.addWidget(connect_button)
+            dialog.setLayout(layout)
+            connect_button.clicked.connect(check_value)
+            exit = dialog.exec_()
+            if exit != QDialog.Accepted:
+                return 
 
             directed = checks.get("Directed", False)
 
             if checks.get("Weighted", False):
-                origin.node.connect(end.node, directed, cost = int(value))
+                origin.node.connect(end.node, directed, cost = int(value_input.text()))
             elif checks.get("Flow", False):
-                origin.node.connect(end.node, directed, maxflow = int(value))
-            else:
-                origin.node.connect(end.node, directed)
-
-            # create the edge
-            edge= origin.node.get_edge(end.node)
-            connection: Connection = self.create_edge(edge)
-            self.scene.addItem(connection)
-            if checks.get("Directed", False):
-                connection.add_arrowhead_to_scene()
-            # # Set the pen for the edge
-            # pen = QPen(Qt.black)
-            # pen.setWidth(2)
-            # edge.setPen(pen)
-
-            # # Add edge to the scene and update edges lists in origin and end
-            # self.scene.addItem(edge)
-            # origin.add_connection(edge)
-            # end.add_connection(edge)
-
-            # close the dialog window
-            dialog.accept()
-
-        # Connect the button
-        connect_button.clicked.connect(connect_vertices)
-
-        # Show
-        dialog.exec_()
+                origin.node.connect(end.node, directed, maxflow = int(value_input.text()))
+        else:
+            origin.node.connect(end.node, checks.get("Directed", False))
+        self.create_connection(origin.node.get_edge(end.node.id))
+        self.unselect_origin_vertex()
 
     def turn_off_modes(self):
         for mode in modes:
@@ -1074,9 +1047,7 @@ class MainWindow(QMainWindow):
                     for edge in node.edges.values():
                         if node != edge.origin:
                             continue
-                        line = self.create_edge(edge)
-                        self.scene.addItem(line)
-                        line.add_arrowhead_to_scene()
+                        line = self.create_connection(edge)
 
             except FileReadError as e:
                 QMessageBox.warning(dialog, f"Error {e.__class__.__name__}", str(e))
