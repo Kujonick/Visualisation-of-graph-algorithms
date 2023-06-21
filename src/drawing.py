@@ -422,11 +422,6 @@ class MainWindow(QMainWindow):
         Vertex.window = self
         self.selected :Vertex = None
 
-        if checks.get("Weighted", False):
-            algorythms_names["PathFinders"] = ["Dijkstra"]
-
-        # OTHER 
-
 
         # Initialize Graph #
 
@@ -829,6 +824,7 @@ class MainWindow(QMainWindow):
         create_button = QPushButton("Create Graph")
 
         def create_graph():
+            checks.clear()
             for check in direction_options_checklist:
                 if check.isChecked():
                     checks[check.text()] = True
@@ -840,6 +836,17 @@ class MainWindow(QMainWindow):
                     checks[check.text()] = True
             print(checks)
             self.changed_graph_options = True
+            
+            global algorythms_names
+            algorythms_names = {
+                "Primitive": ["BFS", "DFS"]
+            }
+            if checks.get("Weighted", False):
+                algorythms_names["PathFinders"] = ["Dijkstra"]
+            
+            # OTHER 
+
+
             dialog.accept()
 
         create_button.clicked.connect(create_graph)
@@ -864,7 +871,6 @@ class MainWindow(QMainWindow):
                 self.nodes.clear()
                 self.scene.clear()
                 self.turn_off_modes()
-                checks.clear()
                 self.initialize_graph()
 
 
