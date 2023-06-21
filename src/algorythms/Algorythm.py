@@ -36,7 +36,7 @@ class Algorytm:
     def change_flow(self, args, next_flow : int):
         edge : Edge = args[0]
         edge.change_flow_to(next_flow)
-        edge.connection.uptade_cost()
+        edge.connection.updade_cost()
     
     def set_connections_selected(self, args, next_selected):
         for connection in self.selected_connections:
@@ -44,6 +44,12 @@ class Algorytm:
         self.selected_connections = next_selected.copy()
         for connection in self.selected_connections:
             connection.set_selected()
+    
+    def change_temp_value(self, args, new_value):
+        edge : Edge = args[0]
+        edge.set_temp_value(new_value)
+        edge.connection.update_temp_value()
+
     #-------------------------------
 
     def write_change_visited(self, node : int, state ):
@@ -67,7 +73,6 @@ class Algorytm:
             node = node.id
         self.steps.add_step(self.selection,None, (self.selectedID, node))
         self.selection(None, node)
-        
         
     
     # Edges
@@ -115,7 +120,25 @@ class Algorytm:
         for x in self.steps.to_last():
             f, args, states = x
             f(args, states[1])
-            
+
+
+    # Functions for subclasses
+    def get_parameters_name(self):
+        raise NotImplementedError(f"get_parameters_name was not implemented for {self.__name__} class")
+
+    def set_parameters(self):
+        raise NotImplementedError(f"set_parameters was not implemented for {self.__name__} class")
+    
+    def constrains(self):
+        raise NotImplementedError(f"constrains was not implemented for {self.__name__} class")
+
+    def check_graph(self):
+        raise NotImplementedError(f"check_graph was not implemented for {self.__name__} class")
+
+    def on_exit(self):
+        return
+    
+     
 class PathSearch (Algorytm):
     def __init__(self, verticies):
         super().__init__(verticies)
@@ -135,6 +158,8 @@ class PathSearch (Algorytm):
             return self.nodes.get(value, None) != None and value != self.parameters['s']
         return False
 
+    def check_graph(self):
+        return True if len(self.nodes) > 0 else "Empty Graph"
 
 class MSTSearch(Algorytm):
     def __init__(self, verticies):
@@ -142,3 +167,12 @@ class MSTSearch(Algorytm):
 
     def get_parameters_name(self):
         return []
+    
+    def set_parameters(self, parameter, value):
+        pass
+    
+    def constrains(self, parameter, value):
+        return True
+    
+    def check_graph(self):
+        return True if len(self.nodes) > 0 else "Empty Graph"

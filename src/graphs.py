@@ -108,6 +108,7 @@ class Edge:
         self.minflow = minflow
         self.cost = cost
         self.connection = None
+        self.temp_value = None
 
     def __hash__(self) -> int:
         return 3*hash(self.origin) + hash(self.end)
@@ -157,6 +158,8 @@ class Edge:
             raise ValueError
         self.cost = value
     
+    def set_temp_value(self, value):
+        self.temp_value = value
     # changes Edge to undirected, if there is another in opposite direction, both are merged
     def change_to_undirected(self) -> None:
         if not self.directed:

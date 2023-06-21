@@ -100,7 +100,7 @@ class Vertex(QGraphicsEllipseItem):
         # Text value
         # if checks.get("With Value", False):
         self.value: QGraphicsTextItem = QGraphicsTextItem('-')
-        self.value.setDefaultTextColor(QColor(255, 0, 0))
+        self.value.setDefaultTextColor(QColor(166, 28, 49))
         self.value.setParentItem(self)
         text_rect = self.value.boundingRect()
         self.value.setPos(node.x - text_rect.width() / 2 + 15, node.y - 4 * text_rect.height() / 5 + 17)
@@ -189,10 +189,14 @@ class Vertex(QGraphicsEllipseItem):
             self.change_color(Vertex_Colors["unvisited"])
 
     def clear_value(self):
-        self.value.setPlainText('')
+        self.value.setPlainText('-')
 
     def changed_value(self):
-        self.value.setPlainText(str(self.node.value))
+        print(self.node.id,self.node.value)
+        if self.node.value is None:
+            self.clear_value()
+        else:
+            self.value.setPlainText(str(self.node.value))
 
     def set_selected(self):
         pen = QPen(Qt.red)
@@ -216,15 +220,11 @@ class Arrowhead(QGraphicsPolygonItem):
             self.update_triangle()
         
         def update_triangle(self):
-            vector = [self.connection.origin_x - self.connection.end_x, self.connection.origin_y - self.connection.end_y]
-            length = (vector[0]**2 + vector[1]**2)**0.5
-            if length == 0:
-                return
-            vector[0], vector[1] = vector[0]/length, vector[1]/length
-            pvector = [-vector[1], vector[0]]
+            pvector = self.connection.pvector
+            vector = [pvector[1], -pvector[0]]
 
             new_traingle = QPolygonF()
-            node_r = 17
+            node_r = 15
             h = 10 + node_r # height of arrow
             w = 5           # width of arrow
             new_traingle.append(QPointF(self.connection.end_x + node_r*vector[0], self.connection.end_y + node_r*vector[1]))
@@ -234,21 +234,72 @@ class Arrowhead(QGraphicsPolygonItem):
 
 
 class Connection(QGraphicsLineItem):
+
+
+    def _count_coordinates(self):
+        origin_x = self.origin.initial_x + 17 + self.origin.x()
+        origin_y = self.origin.initial_y + 17 + self.origin.y()
+        end_x = self.end.initial_x + 17 + self.end.x()
+        end_y = self.end.initial_y + 17 + self.end.y()
+        vector = [origin_x - end_x, origin_y - end_y]
+        length = (vector[0]**2 + vector[1]**2)**0.5
+        if length != 0:
+            vector[0], vector[1] = vector[0]/length, vector[1]/length
+            self.pvector = [-vector[1], vector[0]]
+
+        if not self.directed:
+            self.origin_x = origin_x
+            self.origin_y = origin_y
+            self.end_x = end_x
+            self.end_y = end_y
+        else:
+            offset = 10
+            self.origin_x = origin_x + self.pvector[0]*offset
+            self.origin_y = origin_y + self.pvector[1]*offset
+            self.end_x = end_x + self.pvector[0]*offset
+            self.end_y = end_y + self.pvector[1]*offset
+
+    def _count_text_pos(self, weight:bool = False):
+        if weight:
+            offset = 15
+            text_x = self.line().center().x() + offset * self.pvector[0]
+            text_y = self.line().center().y() + offset * self.pvector[1]
+            self.weight_text.setPos(text_x - self.weight_text.boundingRect().width() / 2,
+                                    text_y - self.weight_text.boundingRect().height() / 2)
+        elif self.edge.temp_value != None:
+            offset = -15
+            text_x = self.line().center().x() + offset * self.pvector[0]
+            text_y = self.line().center().y() + offset * self.pvector[1]
+            self.temp_value_text.setPos(text_x - self.temp_value_text.boundingRect().width() / 2,
+                                        text_y - self.temp_value_text.boundingRect().height() / 2)
+            
     def __init__(self, origin, end, directed, edge):
+        self.origin: Vertex = origin
+        self.end: Vertex = end
+        self.directed = directed
+        self._count_coordinates()
         
+        
+        self.origin_x = origin.initial_x + 17 + origin.x()
+        self.origin_y = origin.initial_y + 17 + origin.y()
+        self.end_x = end.initial_x + 17 + end.x()
+        self.end_y = end.initial_y + 17 + end.y()
+
         self.origin_x = origin.initial_x + 17 + origin.x()
         self.origin_y = origin.initial_y + 17 + origin.y()
         self.end_x = end.initial_x + 17 + end.x()
         self.end_y = end.initial_y + 17 + end.y()
         super().__init__(self.origin_x, self.origin_y,
                          self.end_x, self.end_y)
-        self.origin: Vertex = origin
-        self.end: Vertex = end
-        self.directed = directed
+ 
+        
         self.arrowhead: Arrowhead = None
         self.edge: Edge = edge
         self.edge.connection = self
-        
+        self.temp_value_text = QGraphicsTextItem(self)
+        self.temp_value_text.setDefaultTextColor(Qt.red)
+        self.update_temp_value()
+        self._count_text_pos()
         pen = QPen(Qt.black)
         pen.setWidth(2)
         self.setPen(pen)
@@ -262,12 +313,8 @@ class Connection(QGraphicsLineItem):
 
             self.weight_text.setDefaultTextColor(Qt.black)
             # Calculate the position of the weight text
-            angle = math.atan2(self.line().dy(), self.line().dx())
-            offset = 15
-            text_x = self.line().center().x() + offset * math.sin(angle)
-            text_y = self.line().center().y() - offset * math.cos(angle)
-            self.weight_text.setPos(text_x - self.weight_text.boundingRect().width() / 2,
-                                    text_y - self.weight_text.boundingRect().height() / 2)
+
+            self._count_text_pos(True)
         if directed:
             self.arrowhead = Arrowhead(self)
             
@@ -287,23 +334,15 @@ class Connection(QGraphicsLineItem):
         self.scene().addItem(self.arrowhead)
 
     def adjust(self):
-        self.origin_x = self.origin.initial_x + 17 + self.origin.x()
-        self.origin_y = self.origin.initial_y + 17 + self.origin.y()
-        self.end_x = self.end.initial_x + 17 + self.end.x()
-        self.end_y = self.end.initial_y + 17 + self.end.y()
+        self._count_coordinates()
         start_pos = QPointF(self.origin_x, self.origin_y)
         end_pos = QPointF(self.end_x, self.end_y)
         line = QLineF(start_pos, end_pos)
         self.setLine(line)
-
+        self._count_text_pos()
         if not checks.get("Unweighted", False):
             # Calculate the position of the weight text
-            angle = math.atan2(line.dy(), line.dx())
-            offset = 15
-            text_x = self.line().center().x() + offset * math.sin(angle)
-            text_y = self.line().center().y() - offset * math.cos(angle)
-            self.weight_text.setPos(text_x - self.weight_text.boundingRect().width() / 2,
-                                    text_y - self.weight_text.boundingRect().height() / 2)
+            self._count_text_pos(True)
 
         if self.directed:
             self.arrowhead.update_triangle()
@@ -389,11 +428,17 @@ class Connection(QGraphicsLineItem):
         else:
             self.weight_text.setPlainText("-")
 
-    def uptade_maxflow(self):
+    def updade_maxflow(self):
         if self.edge.maxflow is not None:
             self.weight_text.setPlainText(f"/ {str(self.edge.maxflow)}")
         else:
             self.weight_text.setPlainText("/-")
+
+    def update_temp_value(self):
+        if self.edge.temp_value is not None:
+            self.temp_value_text.setPlainText(str(self.edge.temp_value))
+        else:
+            self.temp_value_text.setPlainText("")
 
 
 class GraphicsScene(QGraphicsScene):
@@ -708,9 +753,6 @@ class MainWindow(QMainWindow):
 
             def check_value():
                 value = value_input.text()
-                if not value:
-                    QMessageBox.warning(dialog, "Warning", "Please enter the weight of the edge.")
-
                 if len(value) == 0:
                     QMessageBox.warning(dialog, "Warning",
                                             "Number must be at least one digit ")
@@ -845,9 +887,10 @@ class MainWindow(QMainWindow):
             }
             if checks.get("Weighted", False):
                 algorythms_names["PathFinders"] = ["Dijkstra"]
+                
                 if checks.get("Undirected", False):
                     algorythms_names["MSTFinders"] = ["Kruskal"]
-
+            
             # OTHER 
 
 
@@ -944,6 +987,7 @@ class MainWindow(QMainWindow):
     def turn_edit_mode(self):
         self.set_run_buttons(False)
         self.algorythm.to_first()
+        self.algorythm.on_exit()
         modes["Run"] = False
         self.algorythm = None
         self.mode_labels["Run"].setVisible(False)
