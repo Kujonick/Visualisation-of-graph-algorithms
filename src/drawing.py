@@ -1,10 +1,11 @@
+import os
 import sys
 import math
 from PyQt5.QtWidgets import QApplication, QMainWindow, QGraphicsScene, QGraphicsView, QGraphicsTextItem, \
     QGraphicsEllipseItem, QGraphicsLineItem, QPushButton, QGridLayout, QDialog, QLabel, QLineEdit, QVBoxLayout, \
-    QMessageBox, QRadioButton, QHBoxLayout, QGroupBox, QComboBox, QGraphicsPolygonItem
+    QMessageBox, QRadioButton, QHBoxLayout, QGroupBox, QComboBox, QGraphicsPolygonItem, qApp
 from PyQt5.QtGui import QPen, QBrush, QColor, QPainter, QPainterPath, QPolygonF
-from PyQt5.QtCore import Qt, QPointF, QLineF, pyqtSignal, pyqtSlot
+from PyQt5.QtCore import Qt, QPointF, QLineF, pyqtSignal, pyqtSlot, QProcess, QCoreApplication
 from typing import List, Dict
 
 from graphs import Node, Edge
@@ -411,7 +412,6 @@ class MainWindow(QMainWindow):
 
     def __init__(self):
         super().__init__()
-
         # Run Starting Window
         self.starting_window()
         if not checks:
@@ -450,45 +450,8 @@ class MainWindow(QMainWindow):
 
         # Add the view to the window
         self.setCentralWidget(self.view)
-
-        # example nodes
-        self.nodes.extend([Node(0, 100, 100), Node(1, 200, 200), Node(2, 300, 100)])
-        nodes = [Node(0, 100, 100), Node(1, 200, 200), Node(2, 300, 100)]
-        nodes[0].connect(nodes[1],directed=checks.get("Directed", False) )
-        # nodes[0].connect(nodes[2], False)
-        nodes[2].connect(nodes[1], directed=checks.get("Directed", False))
-
-        # Create a dictionary to store vertex objects
         self.vertices: Dict[int: Vertex] = {}
-
-        # Add the nodes to the scene
-        for node in nodes:
-            vertex = self.create_vertex(node)
-            self.vertices[node.id] = vertex
-            self.scene.addItem(vertex)
-        edges = set()
-        for node in nodes:
-            for edge in node.edges.values():
-                edges.add(edge)
-        if checks.get("Directed", False):
-            for edge in edges:
-                edge.directed = True
-        if checks.get("Weighted", False):
-            for edge in edges:
-                edge.set_cost(1)
-        if checks.get("Flow", False):
-            for edge in edges:
-                edge.set_maxflow(1)
-        for edge in edges:
-            connection: Connection = self.create_connection(edge)
-            
-
-            # line = self.create_edge(edge)
-            # self.scene.addItem(line)
-            # if checks.get("Directed", False):
-            #     line.add_arrowhead_to_scene()
-        for v in self.vertices.values():
-            v.show()
+        self.initialize_graph()
         # Initialize UI #
 
         # Create grid and buttons
@@ -585,6 +548,44 @@ class MainWindow(QMainWindow):
         self.grid.setColumnStretch(3, 1)
         self.grid.setSpacing(0)
         self.grid.setContentsMargins(0, 0, 0, 0)
+
+    def initialize_graph(self):
+        # example nodes
+        self.nodes.extend([Node(0, 100, 100), Node(1, 200, 200), Node(2, 300, 100)])
+        nodes = [Node(0, 100, 100), Node(1, 200, 200), Node(2, 300, 100)]
+        nodes[0].connect(nodes[1], directed=checks.get("Directed", False))
+        # nodes[0].connect(nodes[2], False)
+        nodes[2].connect(nodes[1], directed=checks.get("Directed", False))
+
+        # Add the nodes to the scene
+        for node in nodes:
+            vertex = self.create_vertex(node)
+            self.vertices[node.id] = vertex
+            self.scene.addItem(vertex)
+        edges = set()
+        for node in nodes:
+            for edge in node.edges.values():
+                edges.add(edge)
+        if checks.get("Directed", False):
+            for edge in edges:
+                edge.directed = True
+        if checks.get("Weighted", False):
+            for edge in edges:
+                edge.set_cost(1)
+        if checks.get("Flow", False):
+            for edge in edges:
+                edge.set_maxflow(1)
+        for edge in edges:
+            connection: Connection = self.create_edge(edge)
+            self.scene.addItem(connection)
+            if checks.get("Directed", False):
+                connection.add_arrowhead_to_scene()
+            # line = self.create_edge(edge)
+            # self.scene.addItem(line)
+            # if checks.get("Directed", False):
+            #     line.add_arrowhead_to_scene()
+        for v in self.vertices.values():
+            v.show()
 
     def keyPressEvent(self, event):
         key = event.key()
@@ -861,8 +862,13 @@ class MainWindow(QMainWindow):
         if modes["Run"]:
             self.turn_edit_mode()
         else:
-            self.view._exit()
-            self.__init__()
+            self.vertices.clear()
+            self.nodes.clear()
+            self.scene.clear()
+            checks.clear()
+            self.starting_window()
+            self.initialize_graph()
+
 
 
     def turn_run_mode(self, dialog_window, algo_name):####
