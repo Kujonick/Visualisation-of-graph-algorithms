@@ -1,8 +1,8 @@
 import sys, os
-module_path = os.path.abspath("src/algorythms")
+module_path = os.path.abspath("algorythms")
 sys.path.append(module_path)
 
-from Algorythm import  PathSearch
+from Algorythm import PathSearch
 from collections import deque
 
 
