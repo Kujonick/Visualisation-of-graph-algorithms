@@ -576,10 +576,7 @@ class MainWindow(QMainWindow):
             for edge in edges:
                 edge.set_maxflow(1)
         for edge in edges:
-            connection: Connection = self.create_edge(edge)
-            self.scene.addItem(connection)
-            if checks.get("Directed", False):
-                connection.add_arrowhead_to_scene()
+            connection: Connection = self.create_connection(edge)
             # line = self.create_edge(edge)
             # self.scene.addItem(line)
             # if checks.get("Directed", False):
