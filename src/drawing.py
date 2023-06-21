@@ -15,6 +15,7 @@ from errors import FileReadError
 from algorythms.algorythmSteps import AlgorythmSteps
 from algorythms.Primitive import BFS, DFS  
 from algorythms.PathFinders import Dijkstra
+from algorythms.MSTFinders import Kruskal
 modes = {
     "Add Vertex": False,
     "Add Edge": False,
@@ -32,7 +33,8 @@ algorythms_names = {
 algorythms = {
     "BFS" : BFS,
     "DFS" : DFS,
-    "Dijkstra" : Dijkstra
+    "Dijkstra" : Dijkstra,
+    "Kruskal" : Kruskal
 }
 
 Vertex_Colors = {
@@ -843,7 +845,9 @@ class MainWindow(QMainWindow):
             }
             if checks.get("Weighted", False):
                 algorythms_names["PathFinders"] = ["Dijkstra"]
-            
+                if checks.get("Undirected", False):
+                    algorythms_names["MSTFinders"] = ["Kruskal"]
+
             # OTHER 
 
 

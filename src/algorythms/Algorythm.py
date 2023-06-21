@@ -134,3 +134,11 @@ class PathSearch (Algorytm):
         if parameter == 't':
             return self.nodes.get(value, None) != None and value != self.parameters['s']
         return False
+
+
+class MSTSearch(Algorytm):
+    def __init__(self, verticies):
+        super().__init__(verticies)
+
+    def get_parameters_name(self):
+        return []
