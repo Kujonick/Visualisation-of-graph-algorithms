@@ -7,6 +7,16 @@ class Dijkstra(PathSearch):
         for node in self.nodes.values():
             self.change_value([node], float('inf'))
 
+    def check_graph(verticies):
+        x = super().check_graph()
+        if x is True:
+            for vert in verticies.values():
+                for edge in vert.node.edges.values():
+                    if edge.get_cost < 0:
+                        return "All edges are needed to be non negative"
+            return True
+        return x
+    
     def start(self):
         s = self.parameters["s"]
         t = self.parameters["t"]
@@ -39,3 +49,7 @@ class Dijkstra(PathSearch):
             v = p
         self.write_selected_connections(line)       
     
+    def on_exit(self):
+        super().on_exit()
+        for node in self.nodes.values():
+            self.change_value([node], None)

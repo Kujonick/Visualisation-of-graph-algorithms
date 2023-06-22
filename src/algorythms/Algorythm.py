@@ -131,9 +131,10 @@ class Algorytm:
     
     def constrains(self):
         raise NotImplementedError(f"constrains was not implemented for {self.__name__} class")
-
-    def check_graph(self):
-        raise NotImplementedError(f"check_graph was not implemented for {self.__name__} class")
+    
+    @classmethod
+    def check_graph(cls, verticies):
+        raise NotImplementedError(f"check_graph was not implemented for {cls.__name__} class")
 
     def on_exit(self):
         return
@@ -158,8 +159,8 @@ class PathSearch (Algorytm):
             return self.nodes.get(value, None) != None and value != self.parameters['s']
         return False
 
-    def check_graph(self):
-        return True if len(self.nodes) > 0 else "Empty Graph"
+    def check_graph(verticies):
+        return True if len(verticies) > 0 else "Empty Graph"
 
 class MSTSearch(Algorytm):
     def __init__(self, verticies):
@@ -174,5 +175,5 @@ class MSTSearch(Algorytm):
     def constrains(self, parameter, value):
         return True
     
-    def check_graph(self):
-        return True if len(self.nodes) > 0 else "Empty Graph"
+    def check_graph(verticies):
+        return True if len(verticies) > 0 else "Empty Graph"

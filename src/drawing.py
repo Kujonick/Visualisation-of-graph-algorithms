@@ -309,7 +309,7 @@ class Connection(QGraphicsLineItem):
             if checks.get("Weighted", False):
                 self.update_weight()
             else:
-                self.uptade_maxflow()
+                self.updade_maxflow()
 
             self.weight_text.setDefaultTextColor(Qt.black)
             # Calculate the position of the weight text
@@ -375,7 +375,7 @@ class Connection(QGraphicsLineItem):
                     self.update_weight()
                 else:
                     self.edge.set_maxflow(int(given_value))
-                    self.uptade_maxflow()
+                    self.updade_maxflow()
                 dialog.close()
                 return
 
@@ -823,6 +823,17 @@ class MainWindow(QMainWindow):
         dialog.setGeometry(300, 300, 300, 100)
         dialog.setModal(True)
 
+
+        def flow_protection():
+            edges_buttons_list = list(checklist_edges_group_box.findChildren(QRadioButton))
+            if edges_buttons_list[2].isChecked():
+                edges_buttons_list[1].setChecked(True)
+
+        def flow_own_protection():
+            edges_buttons_list = list(checklist_direction_group_box.findChildren(QRadioButton))
+            if edges_buttons_list[0].isChecked():
+                edges_buttons_list[1].setChecked(True)
+
         layout = QVBoxLayout()
         checklists_layout = QHBoxLayout()
 
@@ -835,6 +846,9 @@ class MainWindow(QMainWindow):
             if first:
                 radio_button.setChecked(True)
                 first = False
+                radio_button.clicked.connect(flow_protection)
+
+
             checklist_direction_layout.addWidget(radio_button)
             direction_options_checklist.append(radio_button)
         checklist_direction_group_box.setLayout(checklist_direction_layout)
@@ -848,6 +862,8 @@ class MainWindow(QMainWindow):
             if first:
                 radio_button.setChecked(True)
                 first = False
+            elif option == "Flow":
+                radio_button.clicked.connect(flow_own_protection)
             checklist_edges_layout.addWidget(radio_button)
             edge_options_checklist.append(radio_button)
         checklist_edges_group_box.setLayout(checklist_edges_layout)
@@ -924,8 +940,7 @@ class MainWindow(QMainWindow):
 
     def turn_run_mode(self, dialog_window, algo_name):####
 
-
-        self.algorythm : BFS= algorythms[algo_name](self.vertices)
+        self.algorythm = algorythms[algo_name](self.vertices)
         def acceptence():
             text = input.text()
             if len(text) == 0:
