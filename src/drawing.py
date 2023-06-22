@@ -14,7 +14,7 @@ from errors import FileReadError
 
 from algorythms.algorythmSteps import AlgorythmSteps
 from algorythms.Primitive import BFS, DFS  
-from algorythms.PathFinders import Dijkstra
+from algorythms.PathFinders import Dijkstra, BellmanFord
 from algorythms.MSTFinders import Kruskal
 modes = {
     "Add Vertex": False,
@@ -34,6 +34,7 @@ algorythms = {
     "BFS" : BFS,
     "DFS" : DFS,
     "Dijkstra" : Dijkstra,
+    "BellmanFord" : BellmanFord,
     "Kruskal" : Kruskal
 }
 
@@ -76,6 +77,11 @@ def get_vertex_value():
 
 class Vertex(QGraphicsEllipseItem):
     window = None
+
+    def _value_position(self):
+        text_rect = self.value.boundingRect()
+        self.value.setPos(self.node.x - text_rect.width() / 2 + 15, self.node.y - 4 * text_rect.height() / 5 + 17)
+
     def __init__(self, node: Node):
         super().__init__(node.x, node.y, 34, 34)
         # Remember initial position of vertex for mouseReleaseEvent
@@ -102,8 +108,8 @@ class Vertex(QGraphicsEllipseItem):
         self.value: QGraphicsTextItem = QGraphicsTextItem('-')
         self.value.setDefaultTextColor(QColor(166, 28, 49))
         self.value.setParentItem(self)
-        text_rect = self.value.boundingRect()
-        self.value.setPos(node.x - text_rect.width() / 2 + 15, node.y - 4 * text_rect.height() / 5 + 17)
+        
+        self._value_position()
 
         # Set signal in case of removal
 
@@ -197,6 +203,7 @@ class Vertex(QGraphicsEllipseItem):
             self.clear_value()
         else:
             self.value.setPlainText(str(self.node.value))
+        self._value_position()
 
     def set_selected(self):
         pen = QPen(Qt.red)
@@ -279,16 +286,6 @@ class Connection(QGraphicsLineItem):
         self.directed = directed
         self._count_coordinates()
         
-        
-        self.origin_x = origin.initial_x + 17 + origin.x()
-        self.origin_y = origin.initial_y + 17 + origin.y()
-        self.end_x = end.initial_x + 17 + end.x()
-        self.end_y = end.initial_y + 17 + end.y()
-
-        self.origin_x = origin.initial_x + 17 + origin.x()
-        self.origin_y = origin.initial_y + 17 + origin.y()
-        self.end_x = end.initial_x + 17 + end.x()
-        self.end_y = end.initial_y + 17 + end.y()
         super().__init__(self.origin_x, self.origin_y,
                          self.end_x, self.end_y)
  
@@ -355,26 +352,34 @@ class Connection(QGraphicsLineItem):
             return
         if event.button() == Qt.LeftButton and True not in modes.values() and not checks.get("Unweighted", False):
             def change_button():
-                given_value = new_value.text()
-                if len(given_value) == 0:
+                value = new_value.text()
+                if len(value) == 0:
                     QMessageBox.warning(dialog, "Warning",
                                             "Number must be at least one digit ")
                     return 
-                if given_value[0] == '0':
+                if value[0] == '0'and len(value)>1:
                     QMessageBox.warning(dialog, "Warning",
-                                            "Number can't start with 0 (especialy be '0')")
+                                            "Number can't start with 0")
                     return 
-                for sign in given_value:
+                start_idx = 0
+                if value[0] == '-':
+                    start_idx = 1
+                    if value[0] == '0':
+                        QMessageBox.warning(dialog, "Warning",
+                                            "Number can't start with 0")
+                        return 
+
+                for sign in value[start_idx:]:
                     if sign not in '0123456789':
                         QMessageBox.warning(dialog, "Warning",
-                                            "Only numbers [1-9][0-9]*, no floats")
+                                            "Only numbers [-]?[1-9][0-9]*, no floats")
                         return
                     
                 if checks.get("Weighted", False):
-                    self.edge.set_cost(int(given_value))
+                    self.edge.set_cost(int(value))
                     self.update_weight()
                 else:
-                    self.edge.set_maxflow(int(given_value))
+                    self.edge.set_maxflow(int(value))
                     self.updade_maxflow()
                 dialog.close()
                 return
@@ -757,14 +762,22 @@ class MainWindow(QMainWindow):
                     QMessageBox.warning(dialog, "Warning",
                                             "Number must be at least one digit ")
                     return 
-                if value[0] == '0':
+                if value[0] == '0' and len(value)>1:
                     QMessageBox.warning(dialog, "Warning",
-                                            "Number can't start with 0 (especialy be '0')")
+                                            "Number can't start with 0")
                     return 
-                for sign in value:
+                start_idx = 0
+                if value[0] == '-':
+                    start_idx = 1
+                    if value[0] == '0':
+                        QMessageBox.warning(dialog, "Warning",
+                                            "Number can't start with 0")
+                        return 
+
+                for sign in value[start_idx:]:
                     if sign not in '0123456789':
                         QMessageBox.warning(dialog, "Warning",
-                                            "Only numbers [1-9][0-9]*, no floats")
+                                            "Only numbers [-]?[1-9][0-9]*, no floats")
                         return
                 dialog.accept()
                     
@@ -902,7 +915,7 @@ class MainWindow(QMainWindow):
                 "Primitive": ["BFS", "DFS"]
             }
             if checks.get("Weighted", False):
-                algorythms_names["PathFinders"] = ["Dijkstra"]
+                algorythms_names["PathFinders"] = ["Dijkstra", "BellmanFord"]
                 
                 if checks.get("Undirected", False):
                     algorythms_names["MSTFinders"] = ["Kruskal"]
@@ -939,7 +952,13 @@ class MainWindow(QMainWindow):
 
 
     def turn_run_mode(self, dialog_window, algo_name):####
-
+        algo = algorythms[algo_name]
+        check = algo.check_graph(self.vertices)
+        if check is not True:
+            QMessageBox.warning(None, "Warning",
+                                        check)
+            return 
+        
         self.algorythm = algorythms[algo_name](self.vertices)
         def acceptence():
             text = input.text()
